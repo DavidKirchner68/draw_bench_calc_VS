@@ -1,0 +1,17 @@
+I created a folder C:\Users\talkt\DrawBench to create a Python program in. I have a Visual FoxPro 9 called proc_draw.prg to find many of the drawing equations. I have a file called 'Notes from _Wire Technology, Process Engineering and Metallurgy_.DOCX' that has rules for the draw bench. I want a python program that has a visual interface where an operator can input the original diameter, the output diameter or Cold work percentage (reduction of area) and calculate the missing value, output diameter or Cold work percentage.
+	
+Next I want to see what other calculations can be done on these 3 parameters. See the list of procedures to for solve in proc_draw.prg
+
+on the 'Stress & Force' tab, the operator know beginning yield in psi, and the final cold worked yield in psi. make page to have both imperial and metric values. on the 'Thermal' tab, make page to have both imperial and metric values.
+
+Remaining questions for you
+Die angle: Do you specify the semi-angle (e.g. 8°) or the full included angle (e.g. 16°)? I used semi-angle — just one change to flip it if needed.
+Back tension: Do your benches use back tension, or should that field be hidden?
+Tube/hollow drawing: Needed, or solid wire/rod only?
+Pass schedule planning: Want a tab to plan multi-pass reduction sequences?
+1 full angle, 2 no back tension, 3 only solid, 4 yes to pass schedule
+
+
+
+VS: When 'Basic' tab values are calculated, fill 'Pass Schedule' tab with original diameter as Starting Diameter and output diameter as target Diameter. default Strategy value to 1, copy the inputs Diameter units to 'Pass Schedule' tab and link value
+

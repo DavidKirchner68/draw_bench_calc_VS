@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "Draw Bench Calculator",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["draw_bench_calc.py"],
+      "port": 0
+    }
+  ]
+}
