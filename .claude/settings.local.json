@@ -2,7 +2,11 @@
   "permissions": {
     "allow": [
       "Bash(pandoc \"Notes from _Wire Technology, Process Engineering and Metallurgy_.DOCX\" -o notes_output.md)",
-      "Bash(python -c \"import py_compile; py_compile.compile\\(''draw_bench_calc.py'', doraise=True\\)\")"
+      "Bash(python -c \"import py_compile; py_compile.compile\\(''draw_bench_calc.py'', doraise=True\\)\")",
+      "Bash(python -c \"import py_compile; py_compile.compile\\(''draw_bench_calc_VS.py'', doraise=True\\); print\\(''Syntax OK''\\)\")",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)"
     ]
   }
 }

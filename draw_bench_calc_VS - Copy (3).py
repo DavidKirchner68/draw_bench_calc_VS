@@ -18,7 +18,7 @@ MPA_TO_PSI   = 145.038             # 1 MPa  = 145.038 psi
 N_TO_LBF     = 0.224809            # 1 N    = 0.224809 lbf
 KW_TO_HP     = 1.34102             # 1 kW   = 1.34102 hp
 M_S_TO_FT_MIN = 196.850            # 1 m/s  = 196.85 ft/min
-PA_TO_PSI    = MPA_TO_PSI * 1e-6   # 1 Pa → psi  (= 1.4504e-4)
+PA_TO_PSI    = PSI_TO_MPA * 1e-6   # 1 Pa → psi  (= 1.4504e-4)
 
 def dt_c_to_f(delta_c):
     """Temperature RISE  °C → °F   (ΔF = ΔC × 9/5)"""
@@ -151,37 +151,6 @@ def frictional_heating_C(cof, delta_val, sigma_a_Pa, velocity_m_s, ld, spec_heat
     """Surface frictional heat = 1.25·μ·Δ·σ_a·√(v·Ld/(C·ρ·K))  °C"""
     return (1.25 * cof * delta_val * sigma_a_Pa *
             math.sqrt((velocity_m_s * ld) / (spec_heat * density * k_thermal)))
-
-def friction_temp_rise_C(wf_Pa, spec_heat, density):
-    """Temperature rise from friction work alone = Wf/(C·ρ)  °C"""
-    return wf_Pa / (spec_heat * density)
-
-def equilibration_length_m(velocity_m_s, spec_heat, density, d_m, k_thermal):
-    """Leq = (v·C·ρ·d²)/(24·K)  metres  –  distance for cross-section temp equalization"""
-    return (velocity_m_s * spec_heat * density * d_m ** 2) / (24.0 * k_thermal)
-
-def min_draw_stress_delta(cof, ra):
-    """Δ̃_min = 4.9·√(μ/ε)  where ε = ln(1/(1−RA))"""
-    eps = true_strain_ra(ra)
-    return 4.9 * math.sqrt(cof / eps)
-
-def die_pressure_ratio_approx(delta_val):
-    """P/σ_a ≈ Δ/4 + 0.06"""
-    return delta_val / 4.0 + 0.06
-
-def work_hardening_stress_MPa(K_MPa, true_strain, n_exp):
-    """σ₀ = K·ε^n  (power-law work hardening)"""
-    if true_strain <= 0:
-        return 0.0
-    return K_MPa * (true_strain ** n_exp)
-
-def block_exit_speed_m_s(d_block_m, rpm):
-    """V₁ = π·D_block·RPM / 60  (m/rev × rev/min → m/s)"""
-    return math.pi * d_block_m * rpm / 60.0
-
-def archard_sliding_length_m(H_Pa, delta_wear_m, q_const, P_Pa):
-    """Lsliding = (H·δ)/(2·q·P)  metres"""
-    return (H_Pa * delta_wear_m) / (2.0 * q_const * P_Pa)
 
 
 # ─────────────────────────────────────────────────────────────
@@ -585,22 +554,15 @@ class DrawBenchApp:
             padx=10, pady=8)
         inp.pack(fill='x', padx=12, pady=(10, 4))
 
-        die_lbl_opts = dict(label_width=34, label_anchor='e', label_sticky='e')
-        die_inp_opts = dict(entry_width=10, unit_width=12, unit_colspan=1,
-                    tip_col=3, tip_sticky='w', tip_padx=(4, 0),
-                    unit_padx=(0, 0))
-
         self.alpha_var = tk.StringVar(value="16")
         self.alpha_var.trace_add("write", self._sync_angle_from_die)
         self._add_input_row(inp, 0, "Die Included Angle  (full) :", self.alpha_var,
                             "degrees",
-                    "Full included angle of the die (semi-angle = this ÷ 2)",
-                    **die_lbl_opts, **die_inp_opts)
+                            "Full included angle of the die (semi-angle = this ÷ 2)")
 
         self.cof_var = tk.StringVar(value="0.10")
         self._add_input_row(inp, 1, "Coefficient of Friction  μ :", self.cof_var, "",
-                    "Typical: 0.08–0.12 WC dies, good lube;  0.15 = high friction",
-                    **die_lbl_opts, **die_inp_opts)
+                            "Typical: 0.08–0.12 WC dies, good lube;  0.15 = high friction")
 
         tk.Button(inp, text="  Calculate Die Geometry  ",
                   font=("Arial", 11, "bold"),
@@ -613,74 +575,20 @@ class DrawBenchApp:
                             bg=PANEL_BG, fg=HEADER_BG, padx=10, pady=8)
         res.pack(fill='both', expand=True, padx=12, pady=4)
 
-        # Nudge the full results block further left while preserving legibility.
-        die_result_opts = dict(label_width=25, label_anchor='e', label_sticky='e')
-
         self.r_delta      = ResultRow(res, "Deformation Zone Param  Δ", "",
-                          "Δ = (α/RA)·(1+√(1−RA))²  –  ideal 1–3", row=0,
-                          **die_result_opts)
+                                      "Δ = (α/RA)·(1+√(1−RA))²  –  ideal 1–3", row=0)
         self.r_ld         = ResultRow(res, "Deformation Zone Length  Ld", "",
-                          "Ld = (D0−D1)/(2·tan α)", row=1,
-                          **die_result_opts)
+                                      "Ld = (D0−D1)/(2·tan α)", row=1)
         self.r_lc         = ResultRow(res, "Die Contact Length  Lc", "",
-                          "Lc = (D0−D1)/(2·sin α)", row=2,
-                          **die_result_opts)
+                                      "Lc = (D0−D1)/(2·sin α)", row=2)
         self.r_phi        = ResultRow(res, "Redundant Work Factor  Φ", "",
-                          "Φ = (Δ/6)+1", row=3,
-                          **die_result_opts)
-        self.r_phi2       = ResultRow(res, "Redundant Work Factor  Θ", "",
-                          "Θ = 0.8 + Δ/4.4", row=4,
-                          **die_result_opts)
+                                      "Φ = (Δ/6)+1", row=3)
+        self.r_phi2       = ResultRow(res, "Redundant Work Factor  Θ  (alt.)", "",
+                                      "Θ = 0.8 + Δ/4.4", row=4)
         self.r_delta_opt  = ResultRow(res, "Optimum Δ  (for μ, RA)", "",
-                          "Δ_opt = 1.89·√(μ/RA)·(1+√(1−RA))", row=5,
-                          **die_result_opts)
+                                      "Δ_opt = 1.89·√(μ/RA)·(1+√(1−RA))", row=5)
         self.r_alpha_opt  = ResultRow(res, "Optimum Included Angle  (full)", "°",
-                          "Full die angle = 2·α_opt that minimises draw stress", row=6,
-                          **die_result_opts)
-        self.r_min_delta  = ResultRow(res, "Min Draw Stress  Δ̃_min", "",
-                          "Δ̃_min = 4.9·√(μ/ε) – identifies optimum Δ zone", row=7,
-                          **die_result_opts)
-        self.r_psa_ratio  = ResultRow(res, "Approx P/σ_a  (from Δ)", "",
-                          "P/σ_a ≈ Δ/4 + 0.06", row=8,
-                          **die_result_opts)
-
-        # ── Die Wear (Archard) section ────────────────────────
-        dw = tk.LabelFrame(tab, text="  Die Wear  (Archard Equation)  ",
-                           font=("Arial", 10, "bold"),
-                           bg=PANEL_BG, fg=HEADER_BG, padx=10, pady=6)
-        dw.pack(fill='x', padx=12, pady=4)
-
-        # Keep right-aligned labels, but nudge the Die Wear input group further left.
-        dw_lbl_opts = dict(label_width=19, label_anchor='e', label_sticky='e')
-        dw_inp_opts = dict(entry_width=10, unit_width=12, unit_colspan=1,
-                           tip_col=3, tip_sticky='w', tip_padx=(4, 0),
-                           unit_padx=(0, 0))
-
-        self.die_hardness_var = tk.StringVar(value="1500")
-        self._add_input_row(dw, 0, "Die Hardness  H :",
-                            self.die_hardness_var, "HV (Vickers)",
-                            "WC ≈ 1500 HV;  PCD ≈ 8000 HV;  natural diamond ≈ 10000 HV",
-                            **dw_lbl_opts, **dw_inp_opts)
-        self.wear_coeff_var = tk.StringVar(value="1e-4")
-        self._add_input_row(dw, 1, "Wear Coefficient  q :",
-                            self.wear_coeff_var, "(dimensionless)",
-                            "Archard constant – typically 1e-6 (good lube) to 1e-3 (poor lube)",
-                            **dw_lbl_opts, **dw_inp_opts)
-        self.allow_wear_var = tk.StringVar(value="0.0005")
-        self.allow_wear_unit_lbl = self._add_input_row(
-                            dw, 2, "Allowable Wear  δ :",
-                            self.allow_wear_var, "in",
-                            "Max allowable die diameter increase before rework",
-                            **dw_lbl_opts, **dw_inp_opts)
-
-        dw_res = tk.Frame(dw, bg=PANEL_BG)
-        dw_res.grid(row=3, column=0, columnspan=5, sticky='ew', pady=(4, 2))
-        self.r_sliding_len = ResultRow(dw_res, "Sliding Length", "",
-                                       "Lsliding = H·δ/(2·q·P)", row=0)
-        self.r_wire_mass   = ResultRow(dw_res, "Wire Mass Produced", "",
-                                       "M = (π/4)·ρ·d²·Lsliding", row=1)
-        self.r_die_life    = ResultRow(dw_res, "Die Life", "",
-                                       "t = Lsliding / V₁ (needs drawing speed)", row=2)
+                                      "Full die angle = 2·α_opt that minimises draw stress", row=6)
 
         self._die_warn = tk.Label(tab, text="", font=("Arial", 9, "bold"),
                                   bg=BG, fg=WARN_COLOR, wraplength=720, justify='left')
@@ -762,57 +670,11 @@ class DrawBenchApp:
                     "Default is 1 m/s. Change as needed for Force and Power.",
                             **stress_label_opts)
 
-        # Block / Capstan speed helper
-        blk_frame = tk.Frame(inp, bg=PANEL_BG)
-        blk_frame.grid(row=5, column=0, columnspan=6, sticky='w', pady=(2, 0))
-        tk.Label(blk_frame, text="Block speed helper →",
-                 font=("Arial", 9, "italic"), bg=PANEL_BG, fg="#666",
-                 width=34, anchor='e').pack(side='left', padx=(0, 4))
-        tk.Label(blk_frame, text="D_block:", font=("Arial", 9),
-                 bg=PANEL_BG).pack(side='left')
-        self.block_dia_var = tk.StringVar()
-        tk.Entry(blk_frame, textvariable=self.block_dia_var,
-                 font=("Arial", 10), width=8).pack(side='left', padx=2)
-        self.block_dia_unit_lbl = tk.Label(blk_frame, text="in",
-                 font=("Arial", 9), bg=PANEL_BG)
-        self.block_dia_unit_lbl.pack(side='left')
-        tk.Label(blk_frame, text="  RPM:", font=("Arial", 9),
-                 bg=PANEL_BG).pack(side='left', padx=(6, 0))
-        self.block_rpm_var = tk.StringVar()
-        tk.Entry(blk_frame, textvariable=self.block_rpm_var,
-                 font=("Arial", 10), width=7).pack(side='left', padx=2)
-        tk.Button(blk_frame, text="→ V₁", font=("Arial", 9, "bold"),
-                  bg="#27ae60", fg="white", relief='flat', padx=4,
-                  cursor="hand2", command=self._calc_block_speed).pack(
-            side='left', padx=6)
-
-        # Work hardening (optional)
-        wh_frame = tk.Frame(inp, bg=PANEL_BG)
-        wh_frame.grid(row=6, column=0, columnspan=6, sticky='w', pady=(4, 0))
-        tk.Label(wh_frame, text="Work hardening  σ₀=K·ε^n →",
-                 font=("Arial", 9, "italic"), bg=PANEL_BG, fg="#666",
-                 width=34, anchor='e').pack(side='left', padx=(0, 4))
-        tk.Label(wh_frame, text="K:", font=("Arial", 9),
-                 bg=PANEL_BG).pack(side='left')
-        self.wh_K_var = tk.StringVar()
-        tk.Entry(wh_frame, textvariable=self.wh_K_var,
-                 font=("Arial", 10), width=10).pack(side='left', padx=2)
-        tk.Label(wh_frame, text="psi", font=("Arial", 9),
-                 bg=PANEL_BG).pack(side='left')
-        tk.Label(wh_frame, text="  n:", font=("Arial", 9),
-                 bg=PANEL_BG).pack(side='left', padx=(6, 0))
-        self.wh_n_var = tk.StringVar()
-        tk.Entry(wh_frame, textvariable=self.wh_n_var,
-                 font=("Arial", 10), width=6).pack(side='left', padx=2)
-        _bind_tooltip(wh_frame,
-                      "Strength coeff K and exponent n for σ₀ = K·ε^n\n"
-                      "Predicts flow stress from true strain (optional)")
-
         tk.Button(inp, text="  Calculate Stress & Force  ",
                   font=("Arial", 11, "bold"),
                   bg=ACCENT, fg="white", relief='flat', padx=10, pady=5,
                   cursor="hand2", command=self._calc_stress).grid(
-            row=7, column=0, columnspan=6, pady=10)
+            row=5, column=0, columnspan=6, pady=10)
 
         # ── Results ─────────────────────────────────────────
         # Scrollable frame so results don't clip on small screens
@@ -883,15 +745,6 @@ class DrawBenchApp:
         self.r_avg_strain_rate = ResultRow(
             res, "Avg Strain Rate  ε̇", "s⁻¹",
             "ε̇ = ε_t·(V0+V1)/(2·Ld)", row=r,
-            **stress_row_opts); r += 1
-
-        _col_header_row(res, row=r,
-                        label_text="Work Hardening  (optional – requires K, n inputs):",
-                        **stress_row_opts); r += 1
-        self.r_wh_sigma = DualResultRow(
-            res, "Predicted Flow Stress  σ₀ = K·ε^n",
-            "psi", "MPa",
-            "Power-law work hardening prediction from true strain", row=r,
             **stress_row_opts)
 
         self._stress_warn = tk.Label(
@@ -1035,12 +888,6 @@ class DrawBenchApp:
             "ΔT = σ_d/(C·ρ) – total bulk rise using draw stress", row=r,
             metric_first=True,
             **thermal_result_opts); r += 1
-        self.r_tw_friction = DualResultRow(
-            res, "Friction Work Rise  Tfw",
-            "°F rise", "°C rise",
-            "Tfw = Wf/(C·ρ) = 4·μ·Φ·σ_a/(Δ·C·ρ) – no speed needed", row=r,
-            metric_first=True,
-            **thermal_result_opts); r += 1
         self.r_frict_heat = DualResultRow(
             res, "Surface Frictional Heating",
             "°F rise", "°C rise",
@@ -1062,12 +909,6 @@ class DrawBenchApp:
             res, "Max Surface Temp at Die Exit  Tmax",
             "°F", "°C",
             "Tmax = T₀ + Tw + Frictional heating  (needs speed)", row=r,
-            metric_first=True,
-            **thermal_result_opts); r += 1
-        self.r_eq_length = DualResultRow(
-            res, "Equilibration Length  Leq",
-            "ft", "m",
-            "Leq = (v·C·ρ·d²)/(24·K) – distance for temp equalization across wire", row=r,
             metric_first=True,
             **thermal_result_opts)
 
@@ -1299,15 +1140,6 @@ class DrawBenchApp:
             self.r_delta_opt.set(D_opt, fmt="{:.4f}")
             self.r_alpha_opt.set(aopt_deg * 2.0, fmt="{:.2f}")
 
-            # New: Min draw stress delta and approx pressure ratio
-            D_min = min_draw_stress_delta(cof, ra)
-            psa   = die_pressure_ratio_approx(D)
-            self.r_min_delta.set(D_min, fmt="{:.4f}")
-            self.r_psa_ratio.set(psa, fmt="{:.4f}")
-
-            # Die wear (Archard) – compute if stress data available
-            self._calc_die_wear()
-
             warns = []
             if D > 3.0:
                 warns.append(f"⚠  Δ={D:.2f} > 3 → high redundant work.")
@@ -1392,11 +1224,6 @@ class DrawBenchApp:
             a1_m2 = area(d1_m)
             a0_m2 = area(d0_m)
 
-            # BUG FIX: compute Ld in metres for correct strain rate & thermal calcs
-            Ld_m = deformation_zone_length(d0_m, d1_m, alpha_rad)
-            self._ld_m = Ld_m
-            self._d1_m = d1_m
-
             if v_out is not None:
                 sd_Pa = sd_MPa * 1e6
                 F_N   = draw_force_N(sd_Pa, a1_m2)
@@ -1407,7 +1234,7 @@ class DrawBenchApp:
                 v_in_ftmin = v_in * M_S_TO_FT_MIN
 
                 eps_t = true_strain_ra(ra)
-                sr = avg_strain_rate(eps_t, v_in, v_out, Ld_m) if Ld_m > 0 else None
+                sr = avg_strain_rate(eps_t, v_in, v_out, Ld) if Ld > 0 else None
 
                 self._v_out = v_out
                 self._v_in  = v_in
@@ -1426,24 +1253,6 @@ class DrawBenchApp:
                 self.r_avg_strain_rate.clear()
                 self._v_out = None
 
-            # ── Work Hardening (optional) ──────────────────────
-            K_s = self.wh_K_var.get().strip()
-            n_s = self.wh_n_var.get().strip()
-            if K_s and n_s:
-                try:
-                    K_psi = safe_float(K_s, "K")
-                    n_exp = safe_float(n_s, "n")
-                    eps_t = true_strain_ra(ra)
-                    K_MPa_val = K_psi * PSI_TO_MPA
-                    wh_MPa = work_hardening_stress_MPa(K_MPa_val, eps_t, n_exp)
-                    wh_psi = wh_MPa * MPA_TO_PSI
-                    self.r_wh_sigma.set(wh_psi, wh_MPa,
-                                        fmt_imp="{:,.0f}", fmt_met="{:.2f}")
-                except Exception:
-                    self.r_wh_sigma.clear()
-            else:
-                self.r_wh_sigma.clear()
-
             warns = []
             if ratio >= 1.0:
                 warns.append("⚠  σ_d ≥ σ_a  – wire WILL BREAK.")
@@ -1458,7 +1267,6 @@ class DrawBenchApp:
 
             # Keep downstream tabs current from a single Stress calculation action.
             self._calc_thermal()
-            self._calc_die_wear()
             self._calc_schedule()
         except ValueError as exc:
             messagebox.showerror("Input Error", str(exc))
@@ -1473,9 +1281,7 @@ class DrawBenchApp:
             sa_MPa   = self._sigma_a_MPa
             sd_MPa   = self._sigma_d_MPa
             cof      = self._cof
-            phi      = self._phi
-            Ld_m     = getattr(self, '_ld_m', None)
-            d1_m     = getattr(self, '_d1_m', None)
+            Ld       = self._ld
 
             rho   = safe_float(self.density_var.get(),   "Density ρ")
             C     = safe_float(self.spec_heat_var.get(), "Specific Heat C")
@@ -1493,10 +1299,6 @@ class DrawBenchApp:
             dT_C  = adiabatic_rise_C(sd_Pa, C, rho)
             Teq_C = equilibrated_temp_C(T0_C, sd_Pa, C, rho)
 
-            # Friction work temperature rise (no speed needed)
-            Wf_Pa = 4.0 * cof * phi * sa_Pa / D
-            Tfw_C = friction_temp_rise_C(Wf_Pa, C, rho)
-
             # ── Fill rises (ΔF = ΔC × 9/5) ──────────────────
             def dr(row, c_val):
                 row.set(dt_c_to_f(c_val), c_val, fmt_imp="{:.2f}", fmt_met="{:.2f}")
@@ -1505,7 +1307,6 @@ class DrawBenchApp:
             dr(self.r_tw_redundant, Trw_C)
             dr(self.r_tw_total,     Tw_C)
             dr(self.r_adiabatic,    dT_C)
-            dr(self.r_tw_friction,  Tfw_C)
 
             # ── Absolute temperatures ────────────────────────
             def ar(row, c_val):
@@ -1514,21 +1315,12 @@ class DrawBenchApp:
 
             ar(self.r_teq, Teq_C)
 
-            # Frictional heating and equilibration length need speed + Ld_m
-            if hasattr(self, '_v_out') and self._v_out and Ld_m:
-                Tf_C   = frictional_heating_C(cof, D, sa_Pa, self._v_out, Ld_m, C, rho, K)
+            # Frictional heating needs speed
+            if hasattr(self, '_v_out') and self._v_out:
+                Tf_C   = frictional_heating_C(cof, D, sa_Pa, self._v_out, Ld, C, rho, K)
                 Tmax_C = T0_C + Tw_C + Tf_C
                 dr(self.r_frict_heat, Tf_C)
                 ar(self.r_tmax, Tmax_C)
-
-                # Equilibration length
-                if d1_m:
-                    Leq_m  = equilibration_length_m(self._v_out, C, rho, d1_m, K)
-                    Leq_ft = Leq_m * 3.28084
-                    self.r_eq_length.set(Leq_ft, Leq_m,
-                                         fmt_imp="{:,.2f}", fmt_met="{:,.4f}")
-                else:
-                    self.r_eq_length.clear()
             else:
                 self.r_frict_heat.clear()
                 self.r_frict_heat.imp_lbl.config(text="Need speed")
@@ -1536,9 +1328,6 @@ class DrawBenchApp:
                 self.r_tmax.clear()
                 self.r_tmax.imp_lbl.config(text="Need speed")
                 self.r_tmax.met_lbl.config(text="Need speed")
-                self.r_eq_length.clear()
-                self.r_eq_length.imp_lbl.config(text="Need speed")
-                self.r_eq_length.met_lbl.config(text="Need speed")
 
             self.status_var.set(
                 f"Tuw = {Tuw_C:.2f}°C ({dt_c_to_f(Tuw_C):.2f}°F rise)   "
@@ -1607,116 +1396,6 @@ class DrawBenchApp:
             self._suppress = False
 
     # ──────────────────────────────────────────────────────────
-    #  Block speed helper
-    # ──────────────────────────────────────────────────────────
-
-    def _calc_block_speed(self):
-        """Compute V₁ = π·D_block·RPM and fill the speed entry."""
-        try:
-            d_s = self.block_dia_var.get().strip()
-            rpm_s = self.block_rpm_var.get().strip()
-            if not d_s or not rpm_s:
-                messagebox.showinfo("Block Speed",
-                                    "Enter both Block Diameter and RPM.")
-                return
-            d_block = safe_float(d_s, "Block Diameter")
-            rpm = safe_float(rpm_s, "RPM")
-            if d_block <= 0 or rpm <= 0:
-                raise ValueError("Block diameter and RPM must be positive.")
-
-            unit = self.unit_var.get()
-            if unit == "in":
-                d_block_m = d_block * 0.0254
-            else:
-                d_block_m = d_block * 0.001
-            v1_m_s = block_exit_speed_m_s(d_block_m, rpm)
-            self.v_out_var.set(f"{v1_m_s:.4f}")
-            self.status_var.set(
-                f"Block speed: D={d_block} {unit}, {rpm:.0f} RPM  →  "
-                f"V₁ = {v1_m_s:.4f} m/s  ({v1_m_s * M_S_TO_FT_MIN:.1f} ft/min)")
-        except ValueError as exc:
-            messagebox.showerror("Input Error", str(exc))
-
-    # ──────────────────────────────────────────────────────────
-    #  Die wear (Archard)
-    # ──────────────────────────────────────────────────────────
-
-    def _calc_die_wear(self):
-        """Compute Archard die wear results (sliding length, wire mass, die life)."""
-        try:
-            if not hasattr(self, '_sigma_a_MPa') or not hasattr(self, '_phi'):
-                self.r_sliding_len.set(None)
-                self.r_wire_mass.set(None)
-                self.r_die_life.set(None)
-                return
-
-            H_hv = safe_float(self.die_hardness_var.get(), "Die Hardness")
-            q    = safe_float(self.wear_coeff_var.get(),   "Wear Coefficient")
-            dw_s = self.allow_wear_var.get().strip()
-            if not dw_s:
-                return
-            delta_wear = safe_float(dw_s, "Allowable Wear")
-
-            if H_hv <= 0 or q <= 0 or delta_wear <= 0:
-                return
-
-            # Convert units
-            H_Pa = H_hv * 9.81e6          # HV → Pa  (1 HV ≈ 9.81 MPa)
-            unit = self.unit_var.get()
-            if unit == "in":
-                delta_wear_m = delta_wear * 0.0254
-            else:
-                delta_wear_m = delta_wear * 0.001
-
-            P_Pa = self._phi * self._sigma_a_MPa * 1e6   # die pressure in Pa
-
-            Lslide_m = archard_sliding_length_m(H_Pa, delta_wear_m, q, P_Pa)
-
-            # Wire mass (use density from thermal tab if available)
-            try:
-                rho = safe_float(self.density_var.get(), "Density")
-                d1_m = getattr(self, '_d1_m', None)
-                if d1_m and rho > 0:
-                    M_kg = (math.pi / 4.0) * rho * d1_m ** 2 * Lslide_m
-                    M_lb = M_kg * 2.20462
-                    self.r_wire_mass.set(M_kg,
-                                         fmt=f"{{:,.0f}} kg  ({M_lb:,.0f} lb)")
-                else:
-                    self.r_wire_mass.clear()
-            except Exception:
-                self.r_wire_mass.clear()
-
-            # Display sliding length
-            if unit == "in":
-                Lslide_ft = Lslide_m * 3.28084
-                if Lslide_ft > 5280:
-                    self.r_sliding_len.set(Lslide_ft,
-                                           fmt=f"{{:,.0f}} ft  ({Lslide_ft/5280:,.1f} mi)")
-                else:
-                    self.r_sliding_len.set(Lslide_ft, fmt="{:,.0f} ft")
-            else:
-                if Lslide_m > 1000:
-                    self.r_sliding_len.set(Lslide_m,
-                                           fmt=f"{{:,.0f}} m  ({Lslide_m/1000:,.1f} km)")
-                else:
-                    self.r_sliding_len.set(Lslide_m, fmt="{:,.1f} m")
-
-            # Die life (needs speed)
-            v_out = getattr(self, '_v_out', None)
-            if v_out and v_out > 0:
-                t_s = Lslide_m / v_out
-                t_hr = t_s / 3600.0
-                if t_hr > 1.0:
-                    self.r_die_life.set(t_hr, fmt="{:,.1f} hours")
-                else:
-                    self.r_die_life.set(t_s / 60.0, fmt="{:,.1f} minutes")
-            else:
-                self.r_die_life.clear()
-                self.r_die_life.val_lbl.config(text="Need speed")
-        except Exception:
-            pass   # Die wear is optional – don't block other calculations
-
-    # ──────────────────────────────────────────────────────────
     #  Unit-label sync
     # ──────────────────────────────────────────────────────────
 
@@ -1730,10 +1409,6 @@ class DrawBenchApp:
 
         self.d0_unit_lbl.config(text=u)
         self.d1_unit_lbl.config(text=u)
-        if hasattr(self, "block_dia_unit_lbl"):
-            self.block_dia_unit_lbl.config(text=u)
-        if hasattr(self, "allow_wear_unit_lbl"):
-            self.allow_wear_unit_lbl.config(text=u)
         if hasattr(self, "sched_d_start_unit_lbl"):
             self.sched_d_start_unit_lbl.config(text=u)
         if hasattr(self, "sched_d_target_unit_lbl"):
@@ -1757,12 +1432,6 @@ class DrawBenchApp:
         # Basic tab diameters
         for var in (self.d0_var, self.d1_var):
             _convert_var(var)
-
-        # Block diameter and allowable wear
-        if hasattr(self, "block_dia_var"):
-            _convert_var(self.block_dia_var)
-        if hasattr(self, "allow_wear_var"):
-            _convert_var(self.allow_wear_var)
 
         # Pass Schedule diameters (if tab already built)
         if hasattr(self, "sched_d_start_var"):
