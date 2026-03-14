@@ -192,10 +192,18 @@ def _bind_tooltip(widget, text):
 class ResultRow:
     """Single-value result row (used in Basic and Die Geometry tabs)."""
 
-    def __init__(self, parent, label, unit="", tooltip="", row=0):
-        lbl = tk.Label(parent, text=label, font=("Arial", 9),
-                       bg=PANEL_BG, anchor='w')
-        lbl.grid(row=row, column=0, sticky='w', padx=(6, 2), pady=2)
+    def __init__(self, parent, label, unit="", tooltip="", row=0,
+                 label_width=0, label_anchor='w', label_sticky='w'):
+        lbl_kwargs = {
+            "text": label,
+            "font": ("Arial", 9),
+            "bg": PANEL_BG,
+            "anchor": label_anchor,
+        }
+        if label_width:
+            lbl_kwargs["width"] = label_width
+        lbl = tk.Label(parent, **lbl_kwargs)
+        lbl.grid(row=row, column=0, sticky=label_sticky, padx=(6, 2), pady=2)
         if tooltip:
             lbl.config(text=label + " ⓘ", cursor="question_arrow")
             _bind_tooltip(lbl, tooltip)
@@ -235,38 +243,72 @@ class DualResultRow:
 
     def __init__(self, parent, label,
                  unit_imp="", unit_met="",
-                 tooltip="", row=0, bold_label=False):
+                 tooltip="", row=0, bold_label=False,
+                 label_width=0, label_anchor='w', label_sticky='w',
+                 metric_first=False):
         font_lbl = ("Arial", 9, "bold") if bold_label else ("Arial", 9)
-        lbl = tk.Label(parent, text=label, font=font_lbl,
-                       bg=PANEL_BG, anchor='w')
-        lbl.grid(row=row, column=0, sticky='w', padx=(6, 4), pady=2)
+        lbl_kwargs = {
+            "text": label,
+            "font": font_lbl,
+            "bg": PANEL_BG,
+            "anchor": label_anchor,
+        }
+        if label_width:
+            lbl_kwargs["width"] = label_width
+        lbl = tk.Label(parent, **lbl_kwargs)
+        lbl.grid(row=row, column=0, sticky=label_sticky, padx=(6, 4), pady=2)
         if tooltip:
             lbl.config(text=label + " ⓘ", cursor="question_arrow")
             _bind_tooltip(lbl, tooltip)
 
-        self.imp_lbl = tk.Label(parent, text="—",
-                                font=("Courier New", 10, "bold"),
-                                bg=IMP_BG, anchor='e', width=13,
-                                relief='groove', padx=4)
-        self.imp_lbl.grid(row=row, column=1, sticky='e', padx=2, pady=2)
+        if metric_first:
+            self.met_lbl = tk.Label(parent, text="—",
+                                    font=("Courier New", 10, "bold"),
+                                    bg=MET_BG, anchor='e', width=13,
+                                    relief='groove', padx=4)
+            self.met_lbl.grid(row=row, column=1, sticky='e', padx=2, pady=2)
 
-        tk.Label(parent, text=unit_imp, font=("Arial", 9),
-                 bg=PANEL_BG, anchor='w', width=6).grid(
-            row=row, column=2, sticky='w')
+            tk.Label(parent, text=unit_met, font=("Arial", 9),
+                     bg=PANEL_BG, anchor='w', width=8).grid(
+                row=row, column=2, sticky='w')
 
-        tk.Label(parent, text="│", font=("Arial", 10),
-                 bg=PANEL_BG, fg=DIV_COLOR).grid(
-            row=row, column=3, padx=4)
+            tk.Label(parent, text="│", font=("Arial", 10),
+                     bg=PANEL_BG, fg=DIV_COLOR).grid(
+                row=row, column=3, padx=4)
 
-        self.met_lbl = tk.Label(parent, text="—",
-                                font=("Courier New", 10, "bold"),
-                                bg=MET_BG, anchor='e', width=13,
-                                relief='groove', padx=4)
-        self.met_lbl.grid(row=row, column=4, sticky='e', padx=2, pady=2)
+            self.imp_lbl = tk.Label(parent, text="—",
+                                    font=("Courier New", 10, "bold"),
+                                    bg=IMP_BG, anchor='e', width=13,
+                                    relief='groove', padx=4)
+            self.imp_lbl.grid(row=row, column=4, sticky='e', padx=2, pady=2)
 
-        tk.Label(parent, text=unit_met, font=("Arial", 9),
-                 bg=PANEL_BG, anchor='w', width=8).grid(
-            row=row, column=5, sticky='w', padx=(0, 6))
+            tk.Label(parent, text=unit_imp, font=("Arial", 9),
+                     bg=PANEL_BG, anchor='w', width=6).grid(
+                row=row, column=5, sticky='w', padx=(0, 6))
+        else:
+            self.imp_lbl = tk.Label(parent, text="—",
+                                    font=("Courier New", 10, "bold"),
+                                    bg=IMP_BG, anchor='e', width=13,
+                                    relief='groove', padx=4)
+            self.imp_lbl.grid(row=row, column=1, sticky='e', padx=2, pady=2)
+
+            tk.Label(parent, text=unit_imp, font=("Arial", 9),
+                     bg=PANEL_BG, anchor='w', width=6).grid(
+                row=row, column=2, sticky='w')
+
+            tk.Label(parent, text="│", font=("Arial", 10),
+                     bg=PANEL_BG, fg=DIV_COLOR).grid(
+                row=row, column=3, padx=4)
+
+            self.met_lbl = tk.Label(parent, text="—",
+                                    font=("Courier New", 10, "bold"),
+                                    bg=MET_BG, anchor='e', width=13,
+                                    relief='groove', padx=4)
+            self.met_lbl.grid(row=row, column=4, sticky='e', padx=2, pady=2)
+
+            tk.Label(parent, text=unit_met, font=("Arial", 9),
+                     bg=PANEL_BG, anchor='w', width=8).grid(
+                row=row, column=5, sticky='w', padx=(0, 6))
 
     def set(self, val_imp, val_met,
             color=NEUTRAL_COLOR,
@@ -295,13 +337,28 @@ class DualResultRow:
         self.met_lbl.config(text="—", fg=NEUTRAL_COLOR)
 
 
-def _col_header_row(parent, row, label_text="", imp_text="Imperial", met_text="Metric"):
+def _col_header_row(parent, row, label_text="", imp_text="Imperial", met_text="Metric",
+                    label_width=0, label_anchor='w', label_sticky='w',
+                    metric_first=False):
     """Inserts column header labels above a DualResultRow block."""
     if label_text:
-        tk.Label(parent, text=label_text, font=("Arial", 8, "italic"),
-                 bg=PANEL_BG, fg="#555").grid(
-            row=row, column=0, sticky='w', padx=6, pady=(6, 0))
-    for col, txt, bg in ((1, imp_text, IMP_BG), (4, met_text, MET_BG)):
+        hdr_kwargs = {
+            "text": label_text,
+            "font": ("Arial", 8, "italic"),
+            "bg": PANEL_BG,
+            "fg": "#555",
+            "anchor": label_anchor,
+        }
+        if label_width:
+            hdr_kwargs["width"] = label_width
+        tk.Label(parent, **hdr_kwargs).grid(
+            row=row, column=0, sticky=label_sticky, padx=6, pady=(6, 0))
+    if metric_first:
+        hdr_cols = ((1, met_text, MET_BG), (4, imp_text, IMP_BG))
+    else:
+        hdr_cols = ((1, imp_text, IMP_BG), (4, met_text, MET_BG))
+
+    for col, txt, bg in hdr_cols:
         tk.Label(parent, text=txt, font=("Arial", 8, "bold"),
                  bg=bg, fg=HEADER_BG, anchor='center', width=13,
                  relief='flat').grid(row=row, column=col, padx=2, pady=(4, 0))
@@ -327,6 +384,8 @@ class DrawBenchApp:
         self.root.minsize(760, 720)
         self.root.configure(bg=BG)
         self._suppress = False
+        self._last_unit = "in"
+        self._syncing_angle = False
         self._build_ui()
 
     # ──────────────────────────────────────────────────────────
@@ -385,13 +444,13 @@ class DrawBenchApp:
         d0r = tk.Frame(inp, bg=PANEL_BG)
         d0r.pack(fill='x', pady=3)
         tk.Label(d0r, text="Original Diameter  D₀ :", font=("Arial", 10),
-                 bg=PANEL_BG, width=28, anchor='w').pack(side='left')
+                 bg=PANEL_BG, width=28, anchor='e').pack(side='left')
         self.d0_var = tk.StringVar()
         self.d0_entry = tk.Entry(d0r, textvariable=self.d0_var,
                                  font=("Arial", 12), width=14)
         self.d0_entry.pack(side='left', padx=4)
         self.d0_unit_lbl = tk.Label(d0r, text="in", font=("Arial", 10),
-                                    bg=PANEL_BG, width=4, anchor='w')
+                                    bg=PANEL_BG, width=4, anchor='e')
         self.d0_unit_lbl.pack(side='left')
 
         tk.Label(inp,
@@ -403,13 +462,14 @@ class DrawBenchApp:
         d1r = tk.Frame(inp, bg=PANEL_BG)
         d1r.pack(fill='x', pady=3)
         tk.Label(d1r, text="Output Diameter  D₁ :", font=("Arial", 10),
-                 bg=PANEL_BG, width=28, anchor='w').pack(side='left')
+                 bg=PANEL_BG, width=28, anchor='e').pack(side='left')
         self.d1_var = tk.StringVar()
         self.d1_entry = tk.Entry(d1r, textvariable=self.d1_var,
                                  font=("Arial", 12), width=14)
         self.d1_entry.pack(side='left', padx=4)
+        self.d1_entry.bind("<FocusOut>", self._on_d1_focus_out)
         self.d1_unit_lbl = tk.Label(d1r, text="in", font=("Arial", 10),
-                                    bg=PANEL_BG, width=4, anchor='w')
+                                    bg=PANEL_BG, width=4, anchor='e')
         self.d1_unit_lbl.pack(side='left')
         tk.Label(d1r, text="← fill this  OR  the RA below →",
                  font=("Arial", 9, "italic"), bg=PANEL_BG, fg="#888").pack(
@@ -419,12 +479,13 @@ class DrawBenchApp:
         cwr = tk.Frame(inp, bg=PANEL_BG)
         cwr.pack(fill='x', pady=3)
         tk.Label(cwr, text="Cold Work / Red. of Area  RA :", font=("Arial", 10),
-                 bg=PANEL_BG, width=28, anchor='w').pack(side='left')
+                 bg=PANEL_BG, width=28, anchor='e').pack(side='left')
         self.cw_var = tk.StringVar()
         self.cw_entry = tk.Entry(cwr, textvariable=self.cw_var,
                                  font=("Arial", 12), width=14)
         self.cw_entry.pack(side='left', padx=4)
-        tk.Label(cwr, text="%", font=("Arial", 10), bg=PANEL_BG).pack(side='left')
+        tk.Label(cwr, text="%", font=("Arial", 10), bg=PANEL_BG,
+                 width=4, anchor='e').pack(side='left')
 
         # buttons
         bf = tk.Frame(tab, bg=BG)
@@ -441,27 +502,36 @@ class DrawBenchApp:
                             font=("Arial", 10, "bold"),
                             bg=PANEL_BG, fg=HEADER_BG, padx=10, pady=8)
         res.pack(fill='both', expand=True, padx=12, pady=4)
-        res.columnconfigure(1, weight=1)
 
         unit = self.unit_var.get()
+        basic_row_opts = dict(label_width=34, label_anchor='e', label_sticky='e')
         self.r_ra_pct      = ResultRow(res, "Reduction of Area (RA)", "%",
-                                       "RA = (D0²−D1²)/D0² × 100", row=0)
+                           "RA = (D0²−D1²)/D0² × 100", row=0,
+                           **basic_row_opts)
         self.r_ra_frac     = ResultRow(res, "RA Fraction", "",
-                                       "Fraction form  0.0 – 1.0", row=1)
+                           "Fraction form  0.0 – 1.0", row=1,
+                           **basic_row_opts)
         self.r_true_strain = ResultRow(res, "True Strain  ε", "",
-                                       "ε = ln(A0/A1) = ln(1/(1−RA))", row=2)
+                           "ε = ln(A0/A1) = ln(1/(1−RA))", row=2,
+                           **basic_row_opts)
         self.r_eng_strain  = ResultRow(res, "Engineering Strain  e", "",
-                                       "e = (A0−A1)/A1", row=3)
+                           "e = (A0−A1)/A1", row=3,
+                           **basic_row_opts)
         self.r_a0          = ResultRow(res, "Original Area  A₀", "",
-                                       "Cross-sectional area before drawing", row=4)
+                           "Cross-sectional area before drawing", row=4,
+                           **basic_row_opts)
         self.r_a1          = ResultRow(res, "Final Area  A₁", "",
-                                       "Cross-sectional area after drawing", row=5)
+                           "Cross-sectional area after drawing", row=5,
+                           **basic_row_opts)
         self.r_length_ratio = ResultRow(res, "Length Ratio  L₁/L₀", "",
-                                        "Volume conservation: L1/L0 = A0/A1", row=6)
+                        "Volume conservation: L1/L0 = A0/A1", row=6,
+                        **basic_row_opts)
         self.r_dia_ratio   = ResultRow(res, "Diameter Ratio  D₁/D₀", "",
-                                       "", row=7)
-        self.r_d1_calc     = ResultRow(res, "Calculated D₁", "", "", row=8)
-        self.r_cw_calc     = ResultRow(res, "Calculated RA", "%", "", row=9)
+                           "", row=7, **basic_row_opts)
+        self.r_d1_calc     = ResultRow(res, "Calculated D₁", "", "", row=8,
+                           **basic_row_opts)
+        self.r_cw_calc     = ResultRow(res, "Calculated RA", "%", "", row=9,
+                           **basic_row_opts)
 
         tk.Label(tab,
                  text="Commercial practice rarely involves reductions above 30% per pass.  "
@@ -485,6 +555,7 @@ class DrawBenchApp:
         inp.pack(fill='x', padx=12, pady=(10, 4))
 
         self.alpha_var = tk.StringVar(value="16")
+        self.alpha_var.trace_add("write", self._sync_angle_from_die)
         self._add_input_row(inp, 0, "Die Included Angle  (full) :", self.alpha_var,
                             "degrees",
                             "Full included angle of the die (semi-angle = this ÷ 2)")
@@ -539,52 +610,71 @@ class DrawBenchApp:
             padx=10, pady=8)
         inp.pack(fill='x', padx=12, pady=(10, 4))
 
+        # Display RA pulled from Basic tab in user-facing Cold Work % format
+        self.stress_cw_var = tk.StringVar(value="")
+        tk.Label(inp, text="Cold Work :", font=("Arial", 10),
+                 bg=PANEL_BG, width=34, anchor='e').grid(
+            row=0, column=0, sticky='e', padx=(0, 4), pady=(0, 4))
+        tk.Entry(inp, textvariable=self.stress_cw_var,
+                 font=("Arial", 11), width=14,
+                 state='readonly', readonlybackground="#eef4ff",
+                 fg="#1f4e79").grid(
+            row=0, column=1, sticky='w', padx=4, pady=(0, 4))
+        tk.Label(inp, text="%", font=("Arial", 9), bg=PANEL_BG,
+                 width=6, anchor='w').grid(row=0, column=2, sticky='w')
+
         # Column headers for input section
-        tk.Label(inp, text="", bg=PANEL_BG, width=34).grid(row=0, column=0)
+        tk.Label(inp, text="", bg=PANEL_BG, width=34).grid(row=1, column=0)
         tk.Label(inp, text="psi", font=("Arial", 9, "bold"),
                  bg=IMP_BG, fg=HEADER_BG, width=14, anchor='center',
-                 relief='flat').grid(row=0, column=1, padx=2, pady=(2, 4))
-        tk.Label(inp, text="", bg=PANEL_BG, width=6).grid(row=0, column=2)
-        tk.Label(inp, text="│", fg=DIV_COLOR, bg=PANEL_BG).grid(row=0, column=3)
+                 relief='flat').grid(row=1, column=1, padx=2, pady=(2, 4))
+        tk.Label(inp, text="", bg=PANEL_BG, width=6).grid(row=1, column=2)
+        tk.Label(inp, text="│", fg=DIV_COLOR, bg=PANEL_BG).grid(row=1, column=3)
         tk.Label(inp, text="MPa  (auto-converted)",
                  font=("Arial", 9, "bold"),
                  bg=MET_BG, fg=HEADER_BG, width=20, anchor='center',
-                 relief='flat').grid(row=0, column=4, columnspan=2,
+                 relief='flat').grid(row=1, column=4, columnspan=2,
                                      padx=2, pady=(2, 4))
+        stress_label_opts = dict(label_width=34, label_anchor='e', label_sticky='e')
 
         # Beginning yield
-        self.yield_begin_var = tk.StringVar()
+        self.yield_begin_var = tk.StringVar(value="90,000")
         self.yield_begin_mpa_var = tk.StringVar(value="")
+        self.yield_begin_var.trace_add("write", self._format_beginning_yield)
         self._add_dual_input_row(
-            inp, 1,
+            inp, 2,
             "Beginning Yield Strength  σ_y₀ :",
             self.yield_begin_var, "psi",
             self.yield_begin_mpa_var, "MPa",
             "Yield strength of wire entering the die",
-            psi_trace=True)
+            psi_trace=True,
+            **stress_label_opts)
 
         # Final (cold worked) yield
-        self.yield_final_var = tk.StringVar()
+        self.yield_final_var = tk.StringVar(value="180,000")
         self.yield_final_mpa_var = tk.StringVar(value="")
+        self.yield_final_var.trace_add("write", self._format_final_yield)
         self._add_dual_input_row(
-            inp, 2,
+            inp, 3,
             "Final Cold Worked Yield  σ_y₁ :",
             self.yield_final_var, "psi",
             self.yield_final_mpa_var, "MPa",
             "Yield strength of wire after drawing",
-            psi_trace=True)
+            psi_trace=True,
+            **stress_label_opts)
 
         # Speed (metric only – common in wire industry)
-        self.v_out_var = tk.StringVar(value="")
-        self._add_input_row(inp, 3, "Exit Drawing Speed  V₁ :",
-                            self.v_out_var, "m/s  (optional – for Force & Power)",
-                            "Leave blank to skip Force and Power calculations")
+        self.v_out_var = tk.StringVar(value="1")
+        self._add_input_row(inp, 4, "Exit Drawing Speed  V₁ :",
+                    self.v_out_var, "m/s",
+                    "Default is 1 m/s. Change as needed for Force and Power.",
+                            **stress_label_opts)
 
         tk.Button(inp, text="  Calculate Stress & Force  ",
                   font=("Arial", 11, "bold"),
                   bg=ACCENT, fg="white", relief='flat', padx=10, pady=5,
                   cursor="hand2", command=self._calc_stress).grid(
-            row=4, column=0, columnspan=6, pady=10)
+            row=5, column=0, columnspan=6, pady=10)
 
         # ── Results ─────────────────────────────────────────
         # Scrollable frame so results don't clip on small screens
@@ -596,52 +686,66 @@ class DrawBenchApp:
 
         res = res_outer   # direct grid in frame (no scroll needed – fits in window)
 
-        _col_header_row(res, row=0, label_text="Stress values:")
+        stress_row_opts = dict(label_width=34, label_anchor='e', label_sticky='e')
+        _col_header_row(res, row=0, label_text="Stress values:", **stress_row_opts)
         r = 1
         self.r_sigma_a = DualResultRow(
             res, "Ave. Flow Stress  σ_a  = (σ_y₀+σ_y₁)/2",
             "psi", "MPa",
-            "Arithmetic mean of entry and exit yield strengths", row=r); r += 1
+            "Arithmetic mean of entry and exit yield strengths", row=r,
+            **stress_row_opts); r += 1
         self.r_wu = DualResultRow(
             res, "Uniform Work  Wu",
             "psi", "MPa",
-            "Wu = σ_a·ln(1/(1−RA))", row=r); r += 1
+            "Wu = σ_a·ln(1/(1−RA))", row=r,
+            **stress_row_opts); r += 1
         self.r_wr = DualResultRow(
             res, "Redundant Work  Wr",
             "psi", "MPa",
-            "Wr = (Φ−1)·σ_a·ln(1/(1−RA))", row=r); r += 1
+            "Wr = (Φ−1)·σ_a·ln(1/(1−RA))", row=r,
+            **stress_row_opts); r += 1
         self.r_wf = DualResultRow(
             res, "Friction Work  Wf",
             "psi", "MPa",
-            "Wf = 4·μ·Φ·σ_a / Δ", row=r); r += 1
+            "Wf = 4·μ·Φ·σ_a / Δ", row=r,
+            **stress_row_opts); r += 1
         self.r_sigma_d = DualResultRow(
             res, "Drawing Stress  σ_d",
             "psi", "MPa",
-            "σ_d = σ_a·[(3.2/Δ)+0.9]·(α+μ)", row=r); r += 1
+            "σ_d = σ_a·[(3.2/Δ)+0.9]·(α+μ)", row=r,
+            **stress_row_opts); r += 1
 
         # Stress ratio – single value (same either way)
         self.r_sigma_ratio = ResultRow(
             res, "Drawing Stress Ratio  Σ = σ_d/σ_a", "",
-            "MUST be < 1.0 to draw;  guideline: keep below 0.7", row=r); r += 1
+            "MUST be < 1.0 to draw;  guideline: keep below 0.7", row=r,
+            **stress_row_opts); r += 1
 
         self.r_die_pressure = DualResultRow(
             res, "Avg Die Pressure  P = Φ·σ_a",
-            "psi", "MPa", "", row=r); r += 1
+            "psi", "MPa", "", row=r,
+            **stress_row_opts); r += 1
 
-        _col_header_row(res, row=r, label_text="Force & Power  (requires drawing speed):"); r += 1
+        _col_header_row(res, row=r,
+                        label_text="Force & Power  (requires drawing speed):",
+                        **stress_row_opts); r += 1
         self.r_draw_force = DualResultRow(
             res, "Draw Force  F = σ_d · A₁",
-            "lbf", "N", "", row=r); r += 1
+            "lbf", "N", "", row=r,
+            **stress_row_opts); r += 1
         self.r_power = DualResultRow(
             res, "Power  P = F · V₁",
-            "hp", "kW", "", row=r); r += 1
+            "hp", "kW", "", row=r,
+            **stress_row_opts); r += 1
         self.r_v0 = DualResultRow(
             res, "Inlet Wire Speed  V₀",
             "ft/min", "m/s",
-            "V0 = V1·A1/A0  (volume conservation)", row=r); r += 1
+            "V0 = V1·A1/A0  (volume conservation)", row=r,
+            **stress_row_opts); r += 1
         self.r_avg_strain_rate = ResultRow(
             res, "Avg Strain Rate  ε̇", "s⁻¹",
-            "ε̇ = ε_t·(V0+V1)/(2·Ld)", row=r)
+            "ε̇ = ε_t·(V0+V1)/(2·Ld)", row=r,
+            **stress_row_opts)
 
         self._stress_warn = tk.Label(
             tab, text="", font=("Arial", 9, "bold"),
@@ -656,6 +760,9 @@ class DrawBenchApp:
         tab = tk.Frame(self.nb, bg=BG)
         self.nb.add(tab, text="  Thermal  ")
 
+        thermal_label_opts = dict(label_width=28, label_anchor='e', label_sticky='e')
+        thermal_result_opts = dict(label_width=33, label_anchor='e', label_sticky='e')
+
         inp = tk.LabelFrame(
             tab,
             text="  Material & Thermal Parameters  (requires Stress & Force tab first)  ",
@@ -668,7 +775,7 @@ class DrawBenchApp:
         pr.grid(row=0, column=0, columnspan=6, sticky='w', pady=(0, 6))
         tk.Label(pr, text="Material preset:", font=("Arial", 10),
                  bg=PANEL_BG).pack(side='left')
-        self.material_var = tk.StringVar(value="Carbon Steel")
+        self.material_var = tk.StringVar(value="Stainless Steel")
         cb = ttk.Combobox(pr, textvariable=self.material_var,
                           values=["Carbon Steel", "Stainless Steel",
                                   "Copper", "Aluminum", "Custom"],
@@ -689,7 +796,7 @@ class DrawBenchApp:
             row=1, column=4, columnspan=2, padx=2, pady=(2, 4))
 
         # Density
-        self.density_var = tk.StringVar(value="7850")
+        self.density_var = tk.StringVar(value="8000")
         self.density_imp_var = tk.StringVar(value="")
         self._add_dual_input_row(
             inp, 2,
@@ -697,10 +804,11 @@ class DrawBenchApp:
             self.density_var, "kg/m³",
             self.density_imp_var, "lb/ft³",
             "Steel ≈ 7850 kg/m³  (490 lb/ft³)",
-            met_trace=True, met_to_imp=lambda v: v * 0.062428)
+            met_trace=True, met_to_imp=lambda v: v * 0.062428,
+            **thermal_label_opts)
 
         # Specific heat
-        self.spec_heat_var = tk.StringVar(value="502")
+        self.spec_heat_var = tk.StringVar(value="500")
         self.spec_heat_imp_var = tk.StringVar(value="")
         self._add_dual_input_row(
             inp, 3,
@@ -708,10 +816,11 @@ class DrawBenchApp:
             self.spec_heat_var, "J/(kg·K)",
             self.spec_heat_imp_var, "BTU/(lb·°F)",
             "Steel ≈ 502 J/(kg·K)  (0.12 BTU/lb·°F)",
-            met_trace=True, met_to_imp=lambda v: v * 2.3885e-4)
+            met_trace=True, met_to_imp=lambda v: v * 2.3885e-4,
+            **thermal_label_opts)
 
         # Thermal conductivity
-        self.k_therm_var = tk.StringVar(value="50")
+        self.k_therm_var = tk.StringVar(value="16")
         self.k_therm_imp_var = tk.StringVar(value="")
         self._add_dual_input_row(
             inp, 4,
@@ -719,18 +828,23 @@ class DrawBenchApp:
             self.k_therm_var, "W/(m·K)",
             self.k_therm_imp_var, "BTU/(h·ft·°F)",
             "Steel ≈ 50 W/(m·K)  (28.9 BTU/h·ft·°F)",
-            met_trace=True, met_to_imp=lambda v: v * 0.5779)
+            met_trace=True, met_to_imp=lambda v: v * 0.5779,
+            **thermal_label_opts)
 
         # Inlet temperature
         self.t0_c_var = tk.StringVar(value="20")
-        self.t0_f_var = tk.StringVar(value="")
+        self.t0_f_var = tk.StringVar(value=f"{abs_c_to_f(20):.4f}")
         self._add_dual_input_row(
             inp, 5,
             "Inlet Wire Temperature  T₀ :",
             self.t0_c_var, "°C",
             self.t0_f_var, "°F",
             "Wire temperature before entering the die",
-            met_trace=True, met_to_imp=lambda v: v * 9.0/5.0 + 32.0)
+            met_trace=True, met_to_imp=lambda v: v * 9.0/5.0 + 32.0,
+            **thermal_label_opts)
+
+        # Sync visible defaults to selected material preset at startup.
+        self._load_material_preset()
 
         tk.Button(inp, text="  Calculate Temperatures  ",
                   font=("Arial", 11, "bold"),
@@ -740,47 +854,63 @@ class DrawBenchApp:
 
         # ── Results ─────────────────────────────────────────
         res = tk.LabelFrame(
-            tab, text="  Temperature Results  –  Imperial (°F)  │  Metric (°C)  ",
+            tab, text="  Temperature Results  –  Metric (°C)  │  Imperial (°F)  ",
             font=("Arial", 10, "bold"),
             bg=PANEL_BG, fg=HEADER_BG, padx=6, pady=6)
         res.pack(fill='both', expand=True, padx=12, pady=4)
 
         _col_header_row(res, row=0,
                         label_text="Temperature RISES (ΔT)  –  ΔF = ΔC × 9/5 :",
-                        imp_text="Imperial (°F)", met_text="Metric (°C)")
+                        imp_text="Imperial (°F)", met_text="Metric (°C)",
+                        metric_first=True)
         r = 1
         self.r_tw_uniform = DualResultRow(
             res, "Uniform Work Rise  Tuw",
             "°F rise", "°C rise",
-            "Tuw = σ_a·ln(1/(1−RA))/(C·ρ)", row=r); r += 1
+            "Tuw = σ_a·ln(1/(1−RA))/(C·ρ)", row=r,
+            metric_first=True,
+            **thermal_result_opts); r += 1
         self.r_tw_redundant = DualResultRow(
             res, "Redundant Work Rise  Trw",
             "°F rise", "°C rise",
-            "Trw = (Δ−1)·σ_a·ln(1/(1−RA))/(C·ρ)", row=r); r += 1
+            "Trw = (Δ−1)·σ_a·ln(1/(1−RA))/(C·ρ)", row=r,
+            metric_first=True,
+            **thermal_result_opts); r += 1
         self.r_tw_total = DualResultRow(
             res, "Total Wire Rise  Tw  (= Tuw + Trw)",
             "°F rise", "°C rise",
-            "Tw = Δ·σ_a·ln(1/(1−RA))/(C·ρ)", row=r); r += 1
+            "Tw = Δ·σ_a·ln(1/(1−RA))/(C·ρ)", row=r,
+            metric_first=True,
+            **thermal_result_opts); r += 1
         self.r_adiabatic = DualResultRow(
             res, "Adiabatic Heat Rise  ΔT  (from σ_d)",
             "°F rise", "°C rise",
-            "ΔT = σ_d/(C·ρ) – total bulk rise using draw stress", row=r); r += 1
+            "ΔT = σ_d/(C·ρ) – total bulk rise using draw stress", row=r,
+            metric_first=True,
+            **thermal_result_opts); r += 1
         self.r_frict_heat = DualResultRow(
             res, "Surface Frictional Heating",
             "°F rise", "°C rise",
-            "1.25·μ·Δ·σ_a·√(v·Ld/(C·ρ·K)) – needs drawing speed", row=r); r += 1
+            "1.25·μ·Δ·σ_a·√(v·Ld/(C·ρ·K)) – needs drawing speed", row=r,
+            metric_first=True,
+            **thermal_result_opts); r += 1
 
         _col_header_row(res, row=r,
                         label_text="ABSOLUTE temperatures  (T₀ + rises) :",
-                        imp_text="Imperial (°F)", met_text="Metric (°C)"); r += 1
+                        imp_text="Imperial (°F)", met_text="Metric (°C)",
+                        metric_first=True); r += 1
         self.r_teq = DualResultRow(
             res, "Equilibrated Wire Temp  Teq",
             "°F", "°C",
-            "Teq = T0 + σ_d/(C·ρ)", row=r); r += 1
+            "Teq = T0 + σ_d/(C·ρ)", row=r,
+            metric_first=True,
+            **thermal_result_opts); r += 1
         self.r_tmax = DualResultRow(
             res, "Max Surface Temp at Die Exit  Tmax",
             "°F", "°C",
-            "Tmax = T₀ + Tw + Frictional heating  (needs speed)", row=r)
+            "Tmax = T₀ + Tw + Frictional heating  (needs speed)", row=r,
+            metric_first=True,
+            **thermal_result_opts)
 
         tk.Label(
             tab,
@@ -793,20 +923,25 @@ class DrawBenchApp:
     #  Input-row helpers
     # ──────────────────────────────────────────────────────────
 
-    def _add_input_row(self, parent, row, label, var, unit, tooltip=""):
+    def _add_input_row(self, parent, row, label, var, unit, tooltip="",
+                       label_width=34, label_anchor='w', label_sticky='w',
+                       entry_width=14, unit_width=28, unit_colspan=4,
+                       tip_col=6, tip_sticky='w', tip_padx=(0, 0),
+                       unit_padx=(0, 0)):
         tk.Label(parent, text=label, font=("Arial", 10), bg=PANEL_BG,
-                 width=34, anchor='w').grid(
-            row=row, column=0, sticky='w', padx=(0, 4), pady=3)
+                 width=label_width, anchor=label_anchor).grid(
+            row=row, column=0, sticky=label_sticky, padx=(0, 4), pady=3)
         tk.Entry(parent, textvariable=var,
-                 font=("Arial", 11), width=14).grid(
+                 font=("Arial", 11), width=entry_width).grid(
             row=row, column=1, sticky='w', padx=4, pady=3)
         unit_lbl = tk.Label(parent, text=unit, font=("Arial", 9), bg=PANEL_BG,
-                            width=28, anchor='w')
-        unit_lbl.grid(row=row, column=2, columnspan=4, sticky='w')
+                            width=unit_width, anchor='w')
+        unit_lbl.grid(row=row, column=2, columnspan=unit_colspan, sticky='w',
+                  padx=unit_padx)
         if tooltip:
             tip_lbl = tk.Label(parent, text="ⓘ", font=("Arial", 10),
                                bg=PANEL_BG, fg=ACCENT, cursor="question_arrow")
-            tip_lbl.grid(row=row, column=6, sticky='w')
+            tip_lbl.grid(row=row, column=tip_col, sticky=tip_sticky, padx=tip_padx)
             _bind_tooltip(tip_lbl, tooltip)
         return unit_lbl
 
@@ -814,15 +949,16 @@ class DrawBenchApp:
                             var_a, unit_a, var_b, unit_b,
                             tooltip="",
                             psi_trace=False,
-                            met_trace=False, met_to_imp=None):
+                            met_trace=False, met_to_imp=None,
+                            label_width=34, label_anchor='w', label_sticky='w'):
         """
         Two-entry input row. Supports auto-conversion in one direction.
         psi_trace=True  → var_a is psi; var_b shows MPa (read-only, auto-updated)
         met_trace=True  → var_a is metric; var_b shows imperial (read-only, auto-updated)
         """
         tk.Label(parent, text=label, font=("Arial", 10), bg=PANEL_BG,
-                 width=34, anchor='w').grid(
-            row=row, column=0, sticky='w', padx=(0, 4), pady=3)
+                  width=label_width, anchor=label_anchor).grid(
+              row=row, column=0, sticky=label_sticky, padx=(0, 4), pady=3)
 
         tk.Entry(parent, textvariable=var_a,
                  font=("Arial", 11), width=14).grid(
@@ -834,10 +970,18 @@ class DrawBenchApp:
         tk.Label(parent, text="│", font=("Arial", 10),
                  bg=PANEL_BG, fg=DIV_COLOR).grid(row=row, column=3, padx=4)
 
+        conv_bg = MET_BG
+        if psi_trace:
+            # psi -> MPa: converted field is metric
+            conv_bg = MET_BG
+        elif met_trace:
+            # metric -> imperial: converted field is imperial
+            conv_bg = IMP_BG
+
         conv_entry = tk.Entry(parent, textvariable=var_b,
                               font=("Arial", 11), width=14,
                               state='readonly',
-                              readonlybackground=IMP_BG if psi_trace else MET_BG,
+                              readonlybackground=conv_bg,
                               fg="#444")
         conv_entry.grid(row=row, column=4, sticky='w', padx=4, pady=3)
         tk.Label(parent, text=unit_b, font=("Arial", 9),
@@ -853,11 +997,12 @@ class DrawBenchApp:
         if psi_trace:
             def _update_mpa(*_):
                 try:
-                    v = float(var_a.get().strip())
+                    v = float(var_a.get().strip().replace(",", ""))
                     var_b.set(f"{v * PSI_TO_MPA:.4f}")
                 except Exception:
                     var_b.set("")
             var_a.trace_add("write", _update_mpa)
+            _update_mpa()
 
         if met_trace and met_to_imp:
             def _update_imp(*_, fn=met_to_imp):
@@ -867,6 +1012,7 @@ class DrawBenchApp:
                 except Exception:
                     var_b.set("")
             var_a.trace_add("write", _update_imp)
+            _update_imp()
 
     # ──────────────────────────────────────────────────────────
     #  Calculation methods
@@ -922,6 +1068,8 @@ class DrawBenchApp:
             self._d0 = d0
             self._d1 = d1
             self._ra = ra
+            if hasattr(self, 'stress_cw_var'):
+                self.stress_cw_var.set(f"{ra*100:.4f}")
 
             unit = self.unit_var.get()
             a0  = area(d0)
@@ -948,6 +1096,7 @@ class DrawBenchApp:
                 f"D₀ = {d0} {unit}  →  D₁ = {d1:.6g} {unit}   "
                 f"RA = {ra*100:.4f}%   ε = {eps:.4f}{warn}"
             )
+            self._calc_die()
             self._sync_schedule_from_basic()
         except ValueError as exc:
             messagebox.showerror("Input Error", str(exc))
@@ -1017,10 +1166,14 @@ class DrawBenchApp:
             Ld = self._ld
 
             # ── Read psi inputs ──────────────────────────────
-            sy0_psi = safe_float(self.yield_begin_var.get(), "Beginning Yield")
-            sy1_psi = safe_float(self.yield_final_var.get(), "Final CW Yield")
+            sy0_psi = safe_float(self.yield_begin_var.get().replace(",", ""), "Beginning Yield")
+            sy1_psi = safe_float(self.yield_final_var.get().replace(",", ""), "Final CW Yield")
             if sy0_psi <= 0 or sy1_psi <= 0:
                 raise ValueError("Yield strengths must be positive.")
+            if sy0_psi > 1_000_000:
+                raise ValueError("Beginning Yield must be ≤ 1,000,000 psi.")
+            if sy1_psi > 1_000_000:
+                raise ValueError("Final Cold Worked Yield must be ≤ 1,000,000 psi.")
 
             # Average flow stress
             sa_psi = (sy0_psi + sy1_psi) / 2.0
@@ -1111,6 +1264,10 @@ class DrawBenchApp:
                 f"σ_d = {m2p(sd_MPa):,.0f} psi ({sd_MPa:.1f} MPa)   "
                 f"Σ = {ratio:.4f}"
             )
+
+            # Keep downstream tabs current from a single Stress calculation action.
+            self._calc_thermal()
+            self._calc_schedule()
         except ValueError as exc:
             messagebox.showerror("Input Error", str(exc))
             self.status_var.set(f"Error: {exc}")
@@ -1200,18 +1357,105 @@ class DrawBenchApp:
             self.spec_heat_var.set(str(C))
             self.k_therm_var.set(str(K))
 
+    def _format_beginning_yield(self, *_):
+        if getattr(self, "_suppress", False):
+            return
+        s = self.yield_begin_var.get().strip()
+        if not s:
+            return
+        cleaned = s.replace(",", "")
+        try:
+            v = float(cleaned)
+        except ValueError:
+            return
+        # Beginning yield is displayed as whole psi and capped for sanity.
+        v_int = max(0, min(1_000_000, int(round(v))))
+        formatted = f"{v_int:,}"
+        if formatted != s:
+            self._suppress = True
+            self.yield_begin_var.set(formatted)
+            self._suppress = False
+
+    def _format_final_yield(self, *_):
+        if getattr(self, "_suppress", False):
+            return
+        s = self.yield_final_var.get().strip()
+        if not s:
+            return
+        cleaned = s.replace(",", "")
+        try:
+            v = float(cleaned)
+        except ValueError:
+            return
+        # Final CW yield is displayed as whole psi and capped for sanity.
+        v_int = max(0, min(1_000_000, int(round(v))))
+        formatted = f"{v_int:,}"
+        if formatted != s:
+            self._suppress = True
+            self.yield_final_var.set(formatted)
+            self._suppress = False
+
     # ──────────────────────────────────────────────────────────
     #  Unit-label sync
     # ──────────────────────────────────────────────────────────
 
     def _update_unit_labels(self):
         u = self.unit_var.get()
+
+        # Convert entered diameters when toggling units so field values stay meaningful.
+        if self._last_unit != u:
+            self._convert_diameter_vars(self._last_unit, u)
+            self._last_unit = u
+
         self.d0_unit_lbl.config(text=u)
         self.d1_unit_lbl.config(text=u)
         if hasattr(self, "sched_d_start_unit_lbl"):
-            self.sched_d_start_unit_lbl.config(text=f"{u}  (same unit as Basic tab)")
+            self.sched_d_start_unit_lbl.config(text=u)
         if hasattr(self, "sched_d_target_unit_lbl"):
-            self.sched_d_target_unit_lbl.config(text=f"{u}  (same unit as Basic tab)")
+            self.sched_d_target_unit_lbl.config(text=u)
+
+    def _convert_diameter_vars(self, from_unit, to_unit):
+        if from_unit == to_unit:
+            return
+        factor = 25.4 if from_unit == "in" and to_unit == "mm" else (1.0 / 25.4)
+
+        def _convert_var(var):
+            s = var.get().strip()
+            if not s:
+                return
+            try:
+                v = float(s)
+            except ValueError:
+                return
+            var.set(f"{v * factor:.6g}")
+
+        # Basic tab diameters
+        for var in (self.d0_var, self.d1_var):
+            _convert_var(var)
+
+        # Pass Schedule diameters (if tab already built)
+        if hasattr(self, "sched_d_start_var"):
+            _convert_var(self.sched_d_start_var)
+        if hasattr(self, "sched_d_target_var"):
+            _convert_var(self.sched_d_target_var)
+
+    def _sync_angle_from_die(self, *_):
+        if self._syncing_angle or not hasattr(self, "sched_angle_var"):
+            return
+        self._syncing_angle = True
+        try:
+            self.sched_angle_var.set(self.alpha_var.get())
+        finally:
+            self._syncing_angle = False
+
+    def _sync_angle_from_schedule(self, *_):
+        if self._syncing_angle or not hasattr(self, "alpha_var"):
+            return
+        self._syncing_angle = True
+        try:
+            self.alpha_var.set(self.sched_angle_var.get())
+        finally:
+            self._syncing_angle = False
 
     def _sync_schedule_from_basic(self):
         if not hasattr(self, "sched_d_start_var"):
@@ -1222,6 +1466,12 @@ class DrawBenchApp:
         self.sched_param_var.set("1")
         self._update_unit_labels()
 
+    def _on_d1_focus_out(self, _event=None):
+        if self._suppress:
+            return
+        if self.d0_var.get().strip() and self.d1_var.get().strip():
+            self._calc_basic()
+
     # ──────────────────────────────────────────────────────────
     #  Clear
     # ──────────────────────────────────────────────────────────
@@ -1229,6 +1479,8 @@ class DrawBenchApp:
     def _clear_all(self):
         for v in (self.d0_var, self.d1_var, self.cw_var):
             v.set("")
+        if hasattr(self, 'stress_cw_var'):
+            self.stress_cw_var.set("")
         for attr in ('_d0', '_d1', '_ra', '_delta', '_phi', '_ld',
                      '_alpha_rad', '_cof', '_sigma_d_MPa', '_sigma_a_MPa',
                      '_v_out', '_v_in'):
@@ -1258,7 +1510,7 @@ class DrawBenchApp:
 
         # Diameter units (linked with Basic tab via shared self.unit_var)
         unit_row = tk.Frame(inp, bg=PANEL_BG)
-        unit_row.grid(row=0, column=0, columnspan=7, sticky='w', pady=(0, 6))
+        unit_row.grid(row=0, column=0, columnspan=7, pady=(0, 6))
         tk.Label(unit_row, text="Diameter units:", font=("Arial", 10),
                  bg=PANEL_BG).pack(side='left')
         for txt, val in [("Inches (in)", "in"), ("Millimeters (mm)", "mm")]:
@@ -1266,52 +1518,69 @@ class DrawBenchApp:
                            bg=PANEL_BG, font=("Arial", 10),
                            command=self._update_unit_labels).pack(side='left', padx=8)
 
+        sched_label_opts = dict(label_width=30, label_anchor='e', label_sticky='e')
+        sched_input_opts = dict(
+            entry_width=7,
+            unit_width=5,
+            unit_colspan=1,
+            tip_col=1,
+            tip_sticky='e',
+            tip_padx=(0, 14),
+            unit_padx=(0, 0),
+        )
+
         # Starting and target diameters
         self.sched_d_start_var = tk.StringVar()
         self.sched_d_start_unit_lbl = self._add_input_row(
             inp, 1, "Starting Diameter  D_start :",
-            self.sched_d_start_var, "in  (same unit as Basic tab)",
-            "Incoming rod/wire diameter before any passes")
+            self.sched_d_start_var, self.unit_var.get(),
+            "Incoming rod/wire diameter before any passes",
+            **sched_label_opts, **sched_input_opts)
 
         self.sched_d_target_var = tk.StringVar()
         self.sched_d_target_unit_lbl = self._add_input_row(
             inp, 2, "Target Diameter  D_target :",
-            self.sched_d_target_var, "in  (same unit as Basic tab)",
-            "Final finished wire diameter")
+            self.sched_d_target_var, self.unit_var.get(),
+            "Final finished wire diameter",
+            **sched_label_opts, **sched_input_opts)
 
         # Die angle (shared with Die Geometry tab if available, but editable here too)
         self.sched_angle_var = tk.StringVar(value="16")
+        self.sched_angle_var.trace_add("write", self._sync_angle_from_schedule)
         self._add_input_row(inp, 3, "Die Included Angle  (full) :",
-                            self.sched_angle_var, "degrees  (used for Δ column)",
-                            "Full die included angle – same value as Die Geometry tab")
+                            self.sched_angle_var, "degrees",
+                            "Full die included angle – same value as Die Geometry tab",
+                            **sched_label_opts, **sched_input_opts)
+        self.sched_angle_var.set(self.alpha_var.get())
 
         # CoF
         self.sched_cof_var = tk.StringVar(value="0.10")
         self._add_input_row(inp, 4, "Coefficient of Friction  μ :",
                             self.sched_cof_var, "",
-                            "Used to calculate Δ per pass")
+                            "Used to calculate Δ per pass",
+                            **sched_label_opts, **sched_input_opts)
 
         # Strategy selector
         strat_frame = tk.Frame(inp, bg=PANEL_BG)
-        strat_frame.grid(row=5, column=0, columnspan=7, sticky='w', pady=(8, 2))
+        strat_frame.grid(row=5, column=0, columnspan=7, sticky='w', pady=(8, 4))
         tk.Label(strat_frame, text="Strategy:", font=("Arial", 10, "bold"),
-                 bg=PANEL_BG).pack(side='left')
+                 bg=PANEL_BG, width=34, anchor='e').grid(row=0, column=0, sticky='e', padx=(0, 4))
         self.sched_strategy = tk.StringVar(value="n_passes")
         strategies = [
             ("n_passes",  "Equal N passes  (specify N below)"),
             ("const_ra",  "Constant RA per pass  (specify RA% below)"),
             ("const_delta","Constant Δ per pass  (specify Δ below)"),
         ]
-        for val, txt in strategies:
+        for idx, (val, txt) in enumerate(strategies):
             tk.Radiobutton(strat_frame, text=txt, variable=self.sched_strategy,
-                           value=val, bg=PANEL_BG, font=("Arial", 10)).pack(
-                side='left', padx=10)
+                           value=val, bg=PANEL_BG, font=("Arial", 10)).grid(
+                row=idx, column=1, sticky='w', padx=(16, 0), pady=1)
 
         # Strategy-specific input
         param_frame = tk.Frame(inp, bg=PANEL_BG)
-        param_frame.grid(row=6, column=0, columnspan=7, sticky='w', pady=2)
-        tk.Label(param_frame, text="Strategy value:", font=("Arial", 10),
-                 bg=PANEL_BG, width=20, anchor='w').pack(side='left')
+        param_frame.grid(row=6, column=0, columnspan=7, sticky='w', pady=(6, 2))
+        tk.Label(param_frame, text="Pass:", font=("Arial", 10),
+                 bg=PANEL_BG, width=34, anchor='e').pack(side='left')
         self.sched_param_var = tk.StringVar(value="1")
         tk.Entry(param_frame, textvariable=self.sched_param_var,
                  font=("Arial", 11), width=10).pack(side='left', padx=4)
@@ -1324,7 +1593,7 @@ class DrawBenchApp:
                   font=("Arial", 11, "bold"),
                   bg=ACCENT, fg="white", relief='flat', padx=10, pady=5,
                   cursor="hand2", command=self._calc_schedule).grid(
-            row=7, column=0, columnspan=7, pady=10)
+            row=7, column=0, columnspan=7, pady=(10, 6))
 
         # ── Results table ────────────────────────────────────
         tbl_frame = tk.LabelFrame(
