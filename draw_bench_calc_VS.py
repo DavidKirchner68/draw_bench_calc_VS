@@ -183,6 +183,50 @@ def archard_sliding_length_m(H_Pa, delta_wear_m, q_const, P_Pa):
     """Lsliding = (H·δ)/(2·q·P)  metres"""
     return (H_Pa * delta_wear_m) / (2.0 * q_const * P_Pa)
 
+# ── Advanced / utility formulae ─────────────────────────────
+
+def max_reduction_per_pass(n_exp):
+    """R_max = 1 − e^−(n+1)  – theoretical max single-pass RA for strain-hardening material"""
+    return 1.0 - math.exp(-(n_exp + 1.0))
+
+def siebel_draw_stress_MPa(sigma_a_MPa, epsilon, alpha_rad, mu):
+    """Siebel: σ_d = σ_a·[ε + 2α/3 + (μ/α)·ε]  –  additive decomposition"""
+    return sigma_a_MPa * (epsilon + 2.0 * alpha_rad / 3.0 + (mu / alpha_rad) * epsilon)
+
+def bearing_friction_stress_MPa(mu, P_MPa, L_bearing, D1):
+    """Additional stress from die bearing:  σ_b = μ·P·(L_bearing/D1)"""
+    if D1 <= 0:
+        return 0.0
+    return mu * P_MPa * (L_bearing / D1)
+
+def safety_factor(sigma_y1, sigma_d):
+    """SF = σ_y1 / σ_d  (> 1.0 needed;  guideline ≥ 1.5)"""
+    if sigma_d <= 0:
+        return float('inf')
+    return sigma_y1 / sigma_d
+
+def wire_weight_per_m(d_m, rho):
+    """w = (π/4)·d²·ρ  kg/m"""
+    return (math.pi / 4.0) * d_m ** 2 * rho
+
+def spool_capacity_m(d_flange_m, d_hub_m, w_traverse_m, d_wire_m, packing=0.80):
+    """L = packing·π·(D_f²−D_h²)·W / (4·d²)  metres"""
+    return packing * (math.pi * (d_flange_m ** 2 - d_hub_m ** 2) *
+                      w_traverse_m / (4.0 * d_wire_m ** 2))
+
+def wire_resistance_per_m(rho_e, d_m):
+    """R/L = ρ_e / A = ρ_e / (π/4·d²)  Ω/m"""
+    A = (math.pi / 4.0) * d_m ** 2
+    return rho_e / A
+
+def iacs_conductivity(rho_e):
+    """%IACS = (1.7241e-8 / ρ_e) × 100"""
+    return (1.7241e-8 / rho_e) * 100.0
+
+def capstan_back_tension_MPa(sigma_draw_prev_MPa, mu_capstan, n_wraps):
+    """σ_back = σ_d(i−1)·e^(−μ_c·2π·N)"""
+    return sigma_draw_prev_MPa * math.exp(-mu_capstan * 2.0 * math.pi * n_wraps)
+
 
 # ─────────────────────────────────────────────────────────────
 #  Color & style constants
@@ -441,6 +485,7 @@ class DrawBenchApp:
         self._build_tab_stress()
         self._build_tab_thermal()
         self._build_tab_schedule()
+        self._build_tab_advanced()
 
         self.status_var = tk.StringVar(value="Ready – enter values in the Basic tab first.")
         tk.Label(self.root, textvariable=self.status_var,
@@ -1460,6 +1505,7 @@ class DrawBenchApp:
             self._calc_thermal()
             self._calc_die_wear()
             self._calc_schedule()
+            self._calc_advanced()
         except ValueError as exc:
             messagebox.showerror("Input Error", str(exc))
             self.status_var.set(f"Error: {exc}")
@@ -1734,6 +1780,11 @@ class DrawBenchApp:
             self.block_dia_unit_lbl.config(text=u)
         if hasattr(self, "allow_wear_unit_lbl"):
             self.allow_wear_unit_lbl.config(text=u)
+        # Advanced tab unit labels
+        for attr in ("bearing_len_unit_lbl", "spool_flange_unit_lbl",
+                     "spool_hub_unit_lbl", "spool_traverse_unit_lbl"):
+            if hasattr(self, attr):
+                getattr(self, attr).config(text=u)
         if hasattr(self, "sched_d_start_unit_lbl"):
             self.sched_d_start_unit_lbl.config(text=u)
         if hasattr(self, "sched_d_target_unit_lbl"):
@@ -1763,6 +1814,12 @@ class DrawBenchApp:
             _convert_var(self.block_dia_var)
         if hasattr(self, "allow_wear_var"):
             _convert_var(self.allow_wear_var)
+
+        # Advanced tab dimension fields
+        for attr in ("bearing_len_var", "spool_flange_var",
+                     "spool_hub_var", "spool_traverse_var"):
+            if hasattr(self, attr):
+                _convert_var(getattr(self, attr))
 
         # Pass Schedule diameters (if tab already built)
         if hasattr(self, "sched_d_start_var"):
@@ -2104,6 +2161,376 @@ class DrawBenchApp:
             )
             self._sched_summary.config(text=summary)
             self.status_var.set(summary)
+
+        except ValueError as exc:
+            messagebox.showerror("Input Error", str(exc))
+            self.status_var.set(f"Error: {exc}")
+
+
+    # ──────────────────────────────────────────────────────────
+    #  TAB 6 – Advanced
+    # ──────────────────────────────────────────────────────────
+
+    def _build_tab_advanced(self):
+        tab = tk.Frame(self.nb, bg=BG)
+        self.nb.add(tab, text="  Advanced  ")
+
+        # ── Inputs ──────────────────────────────────────────
+        inp = tk.LabelFrame(
+            tab,
+            text="  Advanced Inputs  (uses data from previous tabs where available)  ",
+            font=("Arial", 10, "bold"), bg=PANEL_BG, fg=HEADER_BG,
+            padx=10, pady=6)
+        inp.pack(fill='x', padx=12, pady=(8, 4))
+
+        adv_lbl = dict(label_width=30, label_anchor='e', label_sticky='e')
+        adv_inp = dict(entry_width=10, unit_width=10, unit_colspan=1,
+                       tip_col=3, tip_sticky='w', tip_padx=(4, 0),
+                       unit_padx=(0, 0))
+
+        # Bearing / Land
+        tk.Label(inp, text="── Bearing / Land ──", font=("Arial", 9, "bold"),
+                 bg=PANEL_BG, fg=ACCENT).grid(row=0, column=0, columnspan=4,
+                                               sticky='w', pady=(0, 2))
+        self.bearing_len_var = tk.StringVar()
+        self.bearing_len_unit_lbl = self._add_input_row(
+            inp, 1, "Bearing (Land) Length :",
+            self.bearing_len_var, "in",
+            "Length of the straight bearing section after the approach angle",
+            **adv_lbl, **adv_inp)
+
+        # Spool / Reel
+        tk.Label(inp, text="── Spool / Reel Capacity ──", font=("Arial", 9, "bold"),
+                 bg=PANEL_BG, fg=ACCENT).grid(row=2, column=0, columnspan=4,
+                                               sticky='w', pady=(6, 2))
+        self.spool_flange_var = tk.StringVar()
+        self.spool_flange_unit_lbl = self._add_input_row(
+            inp, 3, "Flange Diameter :",
+            self.spool_flange_var, "in",
+            "Outer diameter of the spool flanges",
+            **adv_lbl, **adv_inp)
+        self.spool_hub_var = tk.StringVar()
+        self.spool_hub_unit_lbl = self._add_input_row(
+            inp, 4, "Hub / Barrel Diameter :",
+            self.spool_hub_var, "in",
+            "Inner diameter (barrel/hub) of the spool",
+            **adv_lbl, **adv_inp)
+        self.spool_traverse_var = tk.StringVar()
+        self.spool_traverse_unit_lbl = self._add_input_row(
+            inp, 5, "Traverse Width :",
+            self.spool_traverse_var, "in",
+            "Width between flanges (winding width)",
+            **adv_lbl, **adv_inp)
+
+        # Electrical
+        tk.Label(inp, text="── Electrical Properties ──", font=("Arial", 9, "bold"),
+                 bg=PANEL_BG, fg=ACCENT).grid(row=6, column=0, columnspan=4,
+                                               sticky='w', pady=(6, 2))
+        elec_frame = tk.Frame(inp, bg=PANEL_BG)
+        elec_frame.grid(row=7, column=0, columnspan=4, sticky='w')
+        tk.Label(elec_frame, text="Preset:", font=("Arial", 9),
+                 bg=PANEL_BG).pack(side='left', padx=(0, 4))
+        self.elec_preset_var = tk.StringVar(value="Copper")
+        elec_combo = ttk.Combobox(elec_frame, textvariable=self.elec_preset_var,
+                                  values=["Copper", "Aluminum", "Carbon Steel",
+                                          "Stainless Steel", "Custom"],
+                                  width=14, state='readonly')
+        elec_combo.pack(side='left', padx=2)
+        elec_combo.bind("<<ComboboxSelected>>", self._load_elec_preset)
+
+        self.resistivity_var = tk.StringVar(value="1.68e-8")
+        self._add_input_row(
+            inp, 8, "Electrical Resistivity  ρ_e :",
+            self.resistivity_var, "Ω·m",
+            "Cu=1.68e-8  Al=2.65e-8  Steel=1.43e-7  SS=6.9e-7",
+            **adv_lbl, **adv_inp)
+
+        # Multi-Die Capstan
+        tk.Label(inp, text="── Multi-Die Capstan ──", font=("Arial", 9, "bold"),
+                 bg=PANEL_BG, fg=ACCENT).grid(row=9, column=0, columnspan=4,
+                                               sticky='w', pady=(6, 2))
+        self.capstan_wraps_var = tk.StringVar(value="3")
+        self._add_input_row(
+            inp, 10, "Number of Wraps  N :",
+            self.capstan_wraps_var, "wraps",
+            "Number of wire wraps on the capstan/block between dies",
+            **adv_lbl, **adv_inp)
+        self.capstan_cof_var = tk.StringVar(value="0.15")
+        self._add_input_row(
+            inp, 11, "Capstan Friction Coeff  μ_c :",
+            self.capstan_cof_var, "",
+            "Friction between wire and capstan surface (typically 0.10 – 0.30)",
+            **adv_lbl, **adv_inp)
+
+        tk.Button(inp, text="  Calculate Advanced  ",
+                  font=("Arial", 11, "bold"),
+                  bg=ACCENT, fg="white", relief='flat', padx=10, pady=5,
+                  cursor="hand2", command=self._calc_advanced).grid(
+            row=12, column=0, columnspan=5, pady=8)
+
+        # ── Results ─────────────────────────────────────────
+        res = tk.LabelFrame(
+            tab, text="  Advanced Results  ",
+            font=("Arial", 10, "bold"),
+            bg=PANEL_BG, fg=HEADER_BG, padx=6, pady=6)
+        res.pack(fill='both', expand=True, padx=12, pady=4)
+
+        adv_res = dict(label_width=34, label_anchor='e', label_sticky='e')
+        r = 0
+
+        _col_header_row(res, row=r, label_text="Stress Comparison:", **adv_res); r += 1
+        self.r_siebel_sd = DualResultRow(
+            res, "Siebel Drawing Stress  σ_d(Siebel)",
+            "psi", "MPa",
+            "σ_d = σ_a·[ε + 2α/3 + (μ/α)·ε] – additive formula", row=r,
+            **adv_res); r += 1
+        self.r_bearing_stress = DualResultRow(
+            res, "Bearing Friction Addition  σ_bearing",
+            "psi", "MPa",
+            "σ_b = μ·P·(L_bearing/D₁) – extra stress from die land", row=r,
+            **adv_res); r += 1
+        self.r_safety_factor = ResultRow(
+            res, "Safety Factor  SF = σ_y₁ / σ_d", "",
+            "Must be > 1.0;  guideline ≥ 1.5 for continuous production", row=r,
+            **adv_res); r += 1
+        self.r_max_ra = ResultRow(
+            res, "Max Single-Pass RA%  (for n)", "%",
+            "R_max = 1 − e^−(n+1) – theoretical max before wire break", row=r,
+            **adv_res); r += 1
+        self.r_rec_bearing = ResultRow(
+            res, "Recommended Bearing Length", "",
+            "Rule of thumb:  0.25·D₁ (short) to 0.50·D₁ (long)", row=r,
+            **adv_res); r += 1
+
+        _col_header_row(res, row=r, label_text="Wire Properties:", **adv_res); r += 1
+        self.r_wire_wt = DualResultRow(
+            res, "Wire Weight per Length",
+            "lb/ft", "kg/m",
+            "w = (π/4)·d²·ρ", row=r,
+            **adv_res); r += 1
+        self.r_resistance = DualResultRow(
+            res, "Electrical Resistance",
+            "Ω/ft", "Ω/m",
+            "R/L = ρ_e / (π/4·d²)", row=r,
+            **adv_res); r += 1
+        self.r_iacs = ResultRow(
+            res, "Conductivity  %IACS", "%",
+            "%IACS = (1.7241e-8 / ρ_e) × 100  (100% = annealed copper)", row=r,
+            **adv_res); r += 1
+
+        _col_header_row(res, row=r, label_text="Spool / Reel:", **adv_res); r += 1
+        self.r_spool_len = DualResultRow(
+            res, "Wire Length on Spool  (80% packing)",
+            "ft", "m",
+            "L = 0.80·π·(D_f²−D_h²)·W / (4·d²)", row=r,
+            **adv_res); r += 1
+        self.r_spool_wt = DualResultRow(
+            res, "Spool Wire Weight",
+            "lb", "kg",
+            "Weight = wire length × weight per length", row=r,
+            **adv_res); r += 1
+
+        _col_header_row(res, row=r, label_text="Multi-Die Capstan:", **adv_res); r += 1
+        self.r_back_tension = DualResultRow(
+            res, "Back Tension from Capstan  σ_back",
+            "psi", "MPa",
+            "σ_back = σ_d·e^(−μ_c·2πN)  – tension decayed by capstan wraps", row=r,
+            **adv_res)
+
+        self._adv_warn = tk.Label(tab, text="", font=("Arial", 9, "bold"),
+                                  bg=BG, fg=WARN_COLOR, wraplength=720, justify='left')
+        self._adv_warn.pack(anchor='w', padx=14, pady=2)
+
+    # ──────────────────────────────────────────────────────────
+    #  Advanced calculations
+    # ──────────────────────────────────────────────────────────
+
+    _ELEC_RESISTIVITY = {
+        "Copper":          1.68e-8,
+        "Aluminum":        2.65e-8,
+        "Carbon Steel":    1.43e-7,
+        "Stainless Steel": 6.90e-7,
+        "Custom":          None,
+    }
+
+    def _load_elec_preset(self, _event=None):
+        rho_e = self._ELEC_RESISTIVITY.get(self.elec_preset_var.get())
+        if rho_e is not None:
+            self.resistivity_var.set(f"{rho_e:.2e}")
+
+    def _calc_advanced(self):
+        try:
+            has_stress = hasattr(self, '_sigma_d_MPa') and hasattr(self, '_sigma_a_MPa')
+            has_basic  = hasattr(self, '_d1') and hasattr(self, '_ra')
+            has_die    = hasattr(self, '_delta') and hasattr(self, '_alpha_rad')
+
+            unit = self.unit_var.get()
+            warns = []
+
+            # ── Stress comparison (needs tabs 1-3 data) ────────
+            if has_stress and has_die and has_basic:
+                sa_MPa = self._sigma_a_MPa
+                sd_MPa = self._sigma_d_MPa
+                ra     = self._ra
+                eps    = true_strain_ra(ra)
+                alpha  = self._alpha_rad
+                mu     = self._cof
+                phi    = self._phi
+                d1     = self._d1
+
+                m2p = lambda mpa: mpa * MPA_TO_PSI
+
+                # Siebel draw stress
+                siebel_MPa = siebel_draw_stress_MPa(sa_MPa, eps, alpha, mu)
+                self.r_siebel_sd.set(m2p(siebel_MPa), siebel_MPa,
+                                     fmt_imp="{:,.1f}", fmt_met="{:.3f}")
+
+                # Bearing friction
+                bearing_s = self.bearing_len_var.get().strip()
+                if bearing_s:
+                    try:
+                        L_b = safe_float(bearing_s, "Bearing Length")
+                        P_MPa = phi * sa_MPa
+                        sb_MPa = bearing_friction_stress_MPa(mu, P_MPa, L_b, d1)
+                        self.r_bearing_stress.set(m2p(sb_MPa), sb_MPa,
+                                                  fmt_imp="{:,.1f}", fmt_met="{:.3f}")
+                    except Exception:
+                        self.r_bearing_stress.clear()
+                else:
+                    self.r_bearing_stress.clear()
+
+                # Safety factor  SF = σ_y1 / σ_d
+                try:
+                    sy1_psi = safe_float(
+                        self.yield_final_var.get().replace(",", ""), "Final Yield")
+                    sy1_MPa = sy1_psi * PSI_TO_MPA
+                    sf = safety_factor(sy1_MPa, sd_MPa)
+                    sf_color = (WARN_COLOR if sf < 1.0 else
+                                CAUTION_COLOR if sf < 1.5 else OK_COLOR)
+                    self.r_safety_factor.set(sf, color=sf_color, fmt="{:.3f}")
+                    if sf < 1.0:
+                        warns.append("⚠  Safety Factor < 1.0 – wire WILL BREAK!")
+                    elif sf < 1.5:
+                        warns.append(f"⚠  Safety Factor = {sf:.2f} – below 1.5 guideline.")
+                except Exception:
+                    self.r_safety_factor.clear()
+
+                # Max RA per pass (needs n from work hardening)
+                n_s = self.wh_n_var.get().strip()
+                if n_s:
+                    try:
+                        n_exp = safe_float(n_s, "n")
+                        rmax = max_reduction_per_pass(n_exp) * 100.0
+                        self.r_max_ra.set(rmax, fmt="{:.1f}")
+                    except Exception:
+                        self.r_max_ra.clear()
+                else:
+                    self.r_max_ra.clear()
+                    self.r_max_ra.val_lbl.config(text="Need n")
+
+                # Recommended bearing length
+                L_lo = 0.25 * d1
+                L_hi = 0.50 * d1
+                self.r_rec_bearing.set(None)
+                self.r_rec_bearing.val_lbl.config(
+                    text=f"{L_lo:.4g} - {L_hi:.4g} {unit}",
+                    fg=NEUTRAL_COLOR)
+            else:
+                for r in (self.r_siebel_sd, self.r_bearing_stress,
+                          self.r_safety_factor, self.r_max_ra, self.r_rec_bearing):
+                    r.clear()
+                if not has_stress:
+                    self.r_siebel_sd.imp_lbl.config(text="Run Stress tab")
+                    self.r_siebel_sd.met_lbl.config(text="Run Stress tab")
+
+            # ── Wire properties (need d1 and density) ──────────
+            if has_basic:
+                d1 = self._d1
+                d1_m = getattr(self, '_d1_m', None)
+                if not d1_m:
+                    d1_m = d1 * 0.0254 if unit == "in" else d1 * 0.001
+
+                # Wire weight
+                try:
+                    rho = safe_float(self.density_var.get(), "Density")
+                    wt_kg_m = wire_weight_per_m(d1_m, rho)
+                    wt_lb_ft = wt_kg_m * 0.671969   # kg/m → lb/ft
+                    self.r_wire_wt.set(wt_lb_ft, wt_kg_m,
+                                       fmt_imp="{:.6f}", fmt_met="{:.6f}")
+                except Exception:
+                    self.r_wire_wt.clear()
+
+                # Electrical resistance
+                try:
+                    rho_e = safe_float(self.resistivity_var.get(), "Resistivity")
+                    R_per_m = wire_resistance_per_m(rho_e, d1_m)
+                    R_per_ft = R_per_m * 0.3048
+                    pct_iacs = iacs_conductivity(rho_e)
+                    self.r_resistance.set(R_per_ft, R_per_m,
+                                          fmt_imp="{:.6g}", fmt_met="{:.6g}")
+                    self.r_iacs.set(pct_iacs, fmt="{:.2f}")
+                except Exception:
+                    self.r_resistance.clear()
+                    self.r_iacs.clear()
+
+                # Spool capacity
+                try:
+                    df_s = self.spool_flange_var.get().strip()
+                    dh_s = self.spool_hub_var.get().strip()
+                    wt_s = self.spool_traverse_var.get().strip()
+                    if df_s and dh_s and wt_s:
+                        d_f = safe_float(df_s, "Flange Dia")
+                        d_h = safe_float(dh_s, "Hub Dia")
+                        w_t = safe_float(wt_s, "Traverse Width")
+                        if unit == "in":
+                            d_f_m = d_f * 0.0254
+                            d_h_m = d_h * 0.0254
+                            w_t_m = w_t * 0.0254
+                        else:
+                            d_f_m = d_f * 0.001
+                            d_h_m = d_h * 0.001
+                            w_t_m = w_t * 0.001
+                        L_m = spool_capacity_m(d_f_m, d_h_m, w_t_m, d1_m)
+                        L_ft = L_m * 3.28084
+                        self.r_spool_len.set(L_ft, L_m,
+                                             fmt_imp="{:,.0f}", fmt_met="{:,.0f}")
+                        # Spool wire weight
+                        try:
+                            rho = safe_float(self.density_var.get(), "Density")
+                            wt_kg_m = wire_weight_per_m(d1_m, rho)
+                            spool_kg = wt_kg_m * L_m
+                            spool_lb = spool_kg * 2.20462
+                            self.r_spool_wt.set(spool_lb, spool_kg,
+                                                fmt_imp="{:,.1f}", fmt_met="{:,.1f}")
+                        except Exception:
+                            self.r_spool_wt.clear()
+                    else:
+                        self.r_spool_len.clear()
+                        self.r_spool_wt.clear()
+                except Exception:
+                    self.r_spool_len.clear()
+                    self.r_spool_wt.clear()
+            else:
+                for r in (self.r_wire_wt, self.r_resistance, self.r_iacs,
+                          self.r_spool_len, self.r_spool_wt):
+                    r.clear()
+
+            # ── Multi-die capstan back tension ─────────────────
+            if has_stress:
+                try:
+                    n_wraps = safe_float(self.capstan_wraps_var.get(), "N wraps")
+                    mu_c = safe_float(self.capstan_cof_var.get(), "Capstan CoF")
+                    sd_MPa = self._sigma_d_MPa
+                    bt_MPa = capstan_back_tension_MPa(sd_MPa, mu_c, n_wraps)
+                    bt_psi = bt_MPa * MPA_TO_PSI
+                    self.r_back_tension.set(bt_psi, bt_MPa,
+                                            fmt_imp="{:,.1f}", fmt_met="{:.3f}")
+                except Exception:
+                    self.r_back_tension.clear()
+            else:
+                self.r_back_tension.clear()
+
+            self._adv_warn.config(text="   ".join(warns))
 
         except ValueError as exc:
             messagebox.showerror("Input Error", str(exc))
