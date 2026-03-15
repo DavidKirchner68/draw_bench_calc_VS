@@ -4,7 +4,7 @@
     {
       "name": "Draw Bench Calculator",
       "runtimeExecutable": "python",
-      "runtimeArgs": ["draw_bench_calc.py"],
+      "runtimeArgs": ["draw_bench_calc_PY.py"],
       "port": 0
     }
   ]
