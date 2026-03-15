@@ -6,7 +6,8 @@
       "Bash(python -c \"import py_compile; py_compile.compile\\(''draw_bench_calc_VS.py'', doraise=True\\); print\\(''Syntax OK''\\)\")",
       "Bash(git add:*)",
       "Bash(git commit:*)",
-      "Bash(git push:*)"
+      "Bash(git push:*)",
+      "WebSearch"
     ]
   }
 }
