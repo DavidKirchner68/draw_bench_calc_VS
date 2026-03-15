@@ -257,18 +257,34 @@ def _bind_tooltip(widget, text):
         tw.wm_overrideredirect(True)
         tw.wm_geometry(f"+{x}+{y}")
         tk.Label(tw, text=text, background="#ffffe0", relief='solid',
-                 borderwidth=1, font=("Arial", 9), justify='left').pack()
+                 borderwidth=1, font=("Arial", 9), justify='left',
+                 wraplength=520).pack()
     def hide(e):
         if tip[0]: tip[0].destroy(); tip[0] = None
     widget.bind("<Enter>", show)
     widget.bind("<Leave>", hide)
 
 
+def _wright_note(parent, text, pack_opts=None):
+    """Add a small ⓘ Wright reference note with tooltip."""
+    if pack_opts is None:
+        pack_opts = dict(anchor='w', padx=14, pady=(1, 1))
+    frame = tk.Frame(parent, bg=BG)
+    frame.pack(**pack_opts)
+    lbl = tk.Label(frame, text="ⓘ Wright ref",
+                   font=("Arial", 8, "italic"),
+                   bg=BG, fg="#7f8c8d", cursor="question_arrow")
+    lbl.pack(side='left')
+    _bind_tooltip(lbl,
+                  "From Wire Technology by Roger N. Wright:\n\n" + text)
+
+
 class ResultRow:
     """Single-value result row (used in Basic and Die Geometry tabs)."""
 
     def __init__(self, parent, label, unit="", tooltip="", row=0,
-                 label_width=0, label_anchor='w', label_sticky='w'):
+                 label_width=0, label_anchor='w', label_sticky='w',
+                 value_width=14):
         lbl_kwargs = {
             "text": label,
             "font": ("Arial", 9),
@@ -285,7 +301,7 @@ class ResultRow:
 
         self.val_lbl = tk.Label(parent, text="—",
                                 font=("Courier New", 10, "bold"),
-                                bg="#eaf0fb", anchor='e', width=14,
+                                bg="#eaf0fb", anchor='e', width=value_width,
                                 relief='groove', padx=4)
         self.val_lbl.grid(row=row, column=1, sticky='e', padx=2, pady=2)
 
@@ -609,6 +625,15 @@ class DrawBenchApp:
         self.r_cw_calc     = ResultRow(res, "Calculated RA", "%", "", row=9,
                            **basic_row_opts)
 
+        _wright_note(tab,
+            "Strain rate = speed / length of deformation zone.\n"
+            "Low Delta: low die angles + high reductions.\n"
+            "High Delta: high die angles + low reductions.\n"
+            "Plastic flow involves crystallographic slip via dislocation\n"
+            "motion. As strain accumulates, dislocation density increases,\n"
+            "causing work hardening (pileups and tangles). Cold-worked\n"
+            "structure recrystallizes above ~0.6 of melting point.")
+
         tk.Label(tab,
                  text="Commercial practice rarely involves reductions above 30% per pass.  "
                       "Drawing limit: draw stress / flow stress < 1.0",
@@ -644,7 +669,10 @@ class DrawBenchApp:
 
         self.cof_var = tk.StringVar(value="0.10")
         self._add_input_row(inp, 1, "Coefficient of Friction  μ :", self.cof_var, "",
-                    "Typical: 0.08–0.12 WC dies, good lube;  0.15 = high friction",
+                    "Typical: 0.08-0.12 WC dies, good lube;  0.15 = high friction\n\n"
+                    "Wright: CoF ~0.15 represents conditions of local sticking.\n"
+                    "Drawing speed has a direct effect on lubricant film thickness\n"
+                    "and the related coefficient of friction.",
                     **die_lbl_opts, **die_inp_opts)
 
         tk.Button(inp, text="  Calculate Die Geometry  ",
@@ -662,7 +690,11 @@ class DrawBenchApp:
         die_result_opts = dict(label_width=25, label_anchor='e', label_sticky='e')
 
         self.r_delta      = ResultRow(res, "Deformation Zone Param  Δ", "",
-                          "Δ = (α/RA)·(1+√(1−RA))²  –  ideal 1–3", row=0,
+                          "Δ = (α/RA)·(1+√(1−RA))²  –  ideal 1-3\n\n"
+                          "Wright: Low Δ (low angles + high reductions) → reduced wear,\n"
+                          "reduced annealing, reduced center bursts, minimised thinning.\n"
+                          "High Δ (high angles + low reductions) → increased die pressure\n"
+                          "and wear. Δ > 1.3 → centerline tensile stress → center bursts.", row=0,
                           **die_result_opts)
         self.r_ld         = ResultRow(res, "Deformation Zone Length  Ld", "",
                           "Ld = (D0−D1)/(2·tan α)", row=1,
@@ -721,11 +753,21 @@ class DrawBenchApp:
         dw_res = tk.Frame(dw, bg=PANEL_BG)
         dw_res.grid(row=3, column=0, columnspan=5, sticky='ew', pady=(4, 2))
         self.r_sliding_len = ResultRow(dw_res, "Sliding Length", "",
-                                       "Lsliding = H·δ/(2·q·P)", row=0)
+                                       "Lsliding = H*delta/(2*q*P)\n\n"
+                                       "Wright: Die wear increased by: increased die pressure,\n"
+                                       "lighter reductions, higher die angles, higher delta, and\n"
+                                       "higher wire flow stress.", row=0)
         self.r_wire_mass   = ResultRow(dw_res, "Wire Mass Produced", "",
                                        "M = (π/4)·ρ·d²·Lsliding", row=1)
         self.r_die_life    = ResultRow(dw_res, "Die Life", "",
                                        "t = Lsliding / V₁ (needs drawing speed)", row=2)
+
+        _wright_note(tab,
+            "Relatively sharp blends recommended for high carbon steel and\n"
+            "stainless steel. Wire abrasion at die entry occurs from die\n"
+            "misalignment. Pressure dies greatly enhance lubricant pressure\n"
+            "at entry without requiring ideal lubrication or high speed.\n"
+            "Average CoF 0.08-0.12 for WC dies.")
 
         self._die_warn = tk.Label(tab, text="", font=("Arial", 9, "bold"),
                                   bg=BG, fg=WARN_COLOR, wraplength=720, justify='left')
@@ -804,7 +846,11 @@ class DrawBenchApp:
         self.v_out_var = tk.StringVar(value="1")
         self._add_input_row(inp, 4, "Exit Drawing Speed  V₁ :",
                     self.v_out_var, "m/s",
-                    "Default is 1 m/s. Change as needed for Force and Power.",
+                    "Default is 1 m/s. Change as needed for Force and Power.\n\n"
+                    "Wright: With effective temperature control, drawing at\n"
+                    "very high speeds (5000 m/min = 83 m/s) may be practical.\n"
+                    "At start-up, low speeds may cause inadequate lubrication\n"
+                    "and wire sticking; also pertinent during die string-up.",
                             **stress_label_opts)
 
         # Block / Capstan speed helper
@@ -901,12 +947,18 @@ class DrawBenchApp:
         # Stress ratio – single value (same either way)
         self.r_sigma_ratio = ResultRow(
             res, "Drawing Stress Ratio  Σ = σ_d/σ_a", "",
-            "MUST be < 1.0 to draw;  guideline: keep below 0.7", row=r,
+            "MUST be < 1.0 to draw;  guideline: keep below 0.7\n\n"
+            "Wright: 0.6 is the practical maximum for aggressive schedules.\n"
+            "Break occurs when draw stress equals yield/breaking stress at\n"
+            "die exit. The ratio reflects work hardening through the die.", row=r,
             **stress_row_opts); r += 1
 
         self.r_die_pressure = DualResultRow(
             res, "Avg Die Pressure  P = Φ·σ_a",
-            "psi", "MPa", "", row=r,
+            "psi", "MPa",
+            "Wright: In the lower Δ range, lighter reductions increase\n"
+            "die pressure. Small reductions (increased Δ) → increased\n"
+            "die pressure → increased die wear.", row=r,
             **stress_row_opts); r += 1
 
         _col_header_row(res, row=r,
@@ -938,6 +990,14 @@ class DrawBenchApp:
             "psi", "MPa",
             "Power-law work hardening prediction from true strain", row=r,
             **stress_row_opts)
+
+        _wright_note(tab,
+            "Centerline tension in drawing promotes porosity and ductile\n"
+            "fracture ('center bursts', 'cuppy cores'). It inhibits\n"
+            "densification of porous centerline structure from casting.\n"
+            "Back tension adds directly to centerline tension, increasing\n"
+            "fracture risk. Through two dies in tandem, the draw stress\n"
+            "for the initial die constitutes back stress for the final die.")
 
         self._stress_warn = tk.Label(
             tab, text="", font=("Arial", 9, "bold"),
@@ -1077,7 +1137,10 @@ class DrawBenchApp:
         self.r_adiabatic = DualResultRow(
             res, "Adiabatic Heat Rise  ΔT  (from σ_d)",
             "°F rise", "°C rise",
-            "ΔT = σ_d/(C·ρ) – total bulk rise using draw stress", row=r,
+            "ΔT = σ_d/(C*rho) - total bulk rise using draw stress\n\n"
+            "Wright: For adiabatic conditions the temperature increase\n"
+            "is proportional to the drawing stress. Deformation heating\n"
+            "does not depend on speed unless strain rate affects flow stress.", row=r,
             metric_first=True,
             **thermal_result_opts); r += 1
         self.r_tw_friction = DualResultRow(
@@ -1089,7 +1152,11 @@ class DrawBenchApp:
         self.r_frict_heat = DualResultRow(
             res, "Surface Frictional Heating",
             "°F rise", "°C rise",
-            "1.25·μ·Δ·σ_a·√(v·Ld/(C·ρ·K)) – needs drawing speed", row=r,
+            "1.25*mu*Delta*sigma_a*sqrt(v*Ld/(C*rho*K)) - needs speed\n\n"
+            "Wright: A 100 C increase in lubricant temperature can\n"
+            "decrease viscosity by nearly two orders of magnitude.\n"
+            "Wire surface temp may actually decrease with increased\n"
+            "speed, concurrent with an increase in lubricant temp.", row=r,
             metric_first=True,
             **thermal_result_opts); r += 1
 
@@ -1116,10 +1183,19 @@ class DrawBenchApp:
             metric_first=True,
             **thermal_result_opts)
 
+        _wright_note(tab,
+            "Martensite forms when certain alloys cool through a critical\n"
+            "temperature. Concurrent stress and deformation affect the\n"
+            "transformation temperatures - drawing temperature of austenitic\n"
+            "stainless steels and shape memory alloys greatly affects\n"
+            "drawn properties for spring and fastener applications.\n"
+            "Equilibrated frictional heating from a given pass does not\n"
+            "depend on drawing speed.")
+
         tk.Label(
             tab,
             text="Note: stress values are converted to Pa internally for SI-correct thermal results.  "
-                 "Temperature rises use ΔF = ΔC×9/5; absolute temps use F = C×9/5 + 32.",
+                 "Temperature rises use ΔF = ΔC*9/5; absolute temps use F = C*9/5 + 32.",
             font=("Arial", 8, "italic"), bg=BG, fg="#555",
             wraplength=820, justify='left').pack(anchor='w', padx=14, pady=(0, 6))
 
@@ -1983,6 +2059,14 @@ class DrawBenchApp:
                   cursor="hand2", command=self._calc_schedule).grid(
             row=7, column=0, columnspan=7, pady=(10, 6))
 
+        _wright_note(tab,
+            "Simplest schedule: constant area reduction per pass.\n"
+            "Constant Delta maintains consistent drawing mechanics\n"
+            "(die pressure, redundant work, centerline tension).\n"
+            "A 'tapered' schedule steadily decreases per-pass reduction\n"
+            "to offset work hardening. Keep sigma_d/sigma_a below 0.7;\n"
+            "0.6 is practical max for aggressive reduction schedules.")
+
         # ── Results table ────────────────────────────────────
         tbl_frame = tk.LabelFrame(
             tab, text="  Pass Schedule Results  ",
@@ -2182,9 +2266,10 @@ class DrawBenchApp:
             font=("Arial", 10, "bold"), bg=PANEL_BG, fg=HEADER_BG,
             padx=10, pady=6)
         inp.pack(fill='x', padx=12, pady=(8, 4))
+        inp.grid_anchor('w')
 
         adv_lbl = dict(label_width=30, label_anchor='e', label_sticky='e')
-        adv_inp = dict(entry_width=10, unit_width=10, unit_colspan=1,
+        adv_inp = dict(entry_width=10, unit_width=7, unit_colspan=1,
                        tip_col=3, tip_sticky='w', tip_padx=(4, 0),
                        unit_padx=(0, 0))
 
@@ -2222,51 +2307,17 @@ class DrawBenchApp:
             "Width between flanges (winding width)",
             **adv_lbl, **adv_inp)
 
-        # Electrical
-        tk.Label(inp, text="── Electrical Properties ──", font=("Arial", 9, "bold"),
-                 bg=PANEL_BG, fg=ACCENT).grid(row=6, column=0, columnspan=4,
-                                               sticky='w', pady=(6, 2))
-        elec_frame = tk.Frame(inp, bg=PANEL_BG)
-        elec_frame.grid(row=7, column=0, columnspan=4, sticky='w')
-        tk.Label(elec_frame, text="Preset:", font=("Arial", 9),
-                 bg=PANEL_BG).pack(side='left', padx=(0, 4))
+        # Keep these advanced constants at defaults without extra UI rows.
         self.elec_preset_var = tk.StringVar(value="Copper")
-        elec_combo = ttk.Combobox(elec_frame, textvariable=self.elec_preset_var,
-                                  values=["Copper", "Aluminum", "Carbon Steel",
-                                          "Stainless Steel", "Custom"],
-                                  width=14, state='readonly')
-        elec_combo.pack(side='left', padx=2)
-        elec_combo.bind("<<ComboboxSelected>>", self._load_elec_preset)
-
         self.resistivity_var = tk.StringVar(value="1.68e-8")
-        self._add_input_row(
-            inp, 8, "Electrical Resistivity  ρ_e :",
-            self.resistivity_var, "Ω·m",
-            "Cu=1.68e-8  Al=2.65e-8  Steel=1.43e-7  SS=6.9e-7",
-            **adv_lbl, **adv_inp)
-
-        # Multi-Die Capstan
-        tk.Label(inp, text="── Multi-Die Capstan ──", font=("Arial", 9, "bold"),
-                 bg=PANEL_BG, fg=ACCENT).grid(row=9, column=0, columnspan=4,
-                                               sticky='w', pady=(6, 2))
         self.capstan_wraps_var = tk.StringVar(value="3")
-        self._add_input_row(
-            inp, 10, "Number of Wraps  N :",
-            self.capstan_wraps_var, "wraps",
-            "Number of wire wraps on the capstan/block between dies",
-            **adv_lbl, **adv_inp)
         self.capstan_cof_var = tk.StringVar(value="0.15")
-        self._add_input_row(
-            inp, 11, "Capstan Friction Coeff  μ_c :",
-            self.capstan_cof_var, "",
-            "Friction between wire and capstan surface (typically 0.10 – 0.30)",
-            **adv_lbl, **adv_inp)
 
         tk.Button(inp, text="  Calculate Advanced  ",
                   font=("Arial", 11, "bold"),
                   bg=ACCENT, fg="white", relief='flat', padx=10, pady=5,
                   cursor="hand2", command=self._calc_advanced).grid(
-            row=12, column=0, columnspan=5, pady=8)
+            row=6, column=0, columnspan=5, pady=8)
 
         # ── Results ─────────────────────────────────────────
         res = tk.LabelFrame(
@@ -2300,6 +2351,7 @@ class DrawBenchApp:
         self.r_rec_bearing = ResultRow(
             res, "Recommended Bearing Length", "",
             "Rule of thumb:  0.25·D₁ (short) to 0.50·D₁ (long)", row=r,
+            value_width=22,
             **adv_res); r += 1
 
         _col_header_row(res, row=r, label_text="Wire Properties:", **adv_res); r += 1
@@ -2327,15 +2379,28 @@ class DrawBenchApp:
         self.r_spool_wt = DualResultRow(
             res, "Spool Wire Weight",
             "lb", "kg",
-            "Weight = wire length × weight per length", row=r,
+            "Weight = wire length x weight per length", row=r,
             **adv_res); r += 1
 
         _col_header_row(res, row=r, label_text="Multi-Die Capstan:", **adv_res); r += 1
         self.r_back_tension = DualResultRow(
-            res, "Back Tension from Capstan  σ_back",
+            res, "Back Tension from Capstan  sigma_back",
             "psi", "MPa",
-            "σ_back = σ_d·e^(−μ_c·2πN)  – tension decayed by capstan wraps", row=r,
+            "sigma_back = sigma_d * e^(-mu_c * 2*pi*N)\n\n"
+            "Wright: Back tension adds directly to centerline tension,\n"
+            "increasing fracture risk. Through two dies in tandem,\n"
+            "draw stress for the initial die = back stress for the final die.", row=r,
             **adv_res)
+
+        _wright_note(tab,
+            "Cockcroft-Latham material constant c is a fundamental index\n"
+            "of workability and drawability. Predictor: ln(A0/Af).\n"
+            "Break occurs when draw stress equals yield/breaking stress.\n"
+            "Wire 'fines' flake off during drawing (wire wear, not die wear).\n\n"
+            "Lubrication greatly impacted by incoming wire surface condition,\n"
+            "especially after annealing or hot working. Vigorous procedures\n"
+            "(pickling, descaling, shaving) may be needed. Oxalates used\n"
+            "for stainless steel drawing.")
 
         self._adv_warn = tk.Label(tab, text="", font=("Arial", 9, "bold"),
                                   bg=BG, fg=WARN_COLOR, wraplength=720, justify='left')
